@@ -1,10 +1,17 @@
-from pathlib import Path
+import enum
+import warnings
 import numpy as np
+from pathlib import Path
 from typing import Optional
 
-from customtypes import PathLike
-from dataobjects import SubvolumeFingerprint, Subvolume, EagerSlice
 
+from customtypes import PathLike
+from dataobjects import (SubvolumeFingerprint, Subvolume, AbstractSlice,
+                         CachingSlice, LazySlice, InstanceFingerprint)
+
+
+DEFAULT_SUFFIX: str = 'tif'
+DEFAULT_SUBVOLUME_PREFIX: str = 'subvol'
 
 
 def parse_directory_identifier(identifier: str) -> dict:
@@ -24,11 +31,12 @@ def parse_directory_identifier(identifier: str) -> dict:
 def parse_filename_identifier(identifier: str) -> dict:
     (ID, class_, voltage, current,
      duration, averages, last) = identifier.split('_')
-    index, _ = last.split('.')
+    index, suffix = last.split('.')
     attributes = {
         'ID' : ID, 'class_' : class_, 'voltage' : voltage,
         'current' : current, 'duration' : duration,
-        'averages' : averages, 'index' : index
+        'averages' : averages, 'index' : index,
+        'suffix' : suffix
     }
     return attributes
 
@@ -43,8 +51,8 @@ def postprocess_class(class_: str) -> str:
 def postprocess_averages(averages: str) -> str:
     return int(averages.removesuffix('mitt'))
 
-def postprocess_slice_index(slice_index: str) -> int:
-    return int(slice_index)
+def postprocess_index(index: str) -> int:
+    return int(index)
 
 
 def postprocess(attributes: dict) -> dict:
@@ -53,9 +61,8 @@ def postprocess(attributes: dict) -> dict:
         'ID' : postprocess_ID,
         'class_' : postprocess_class,
         'averages' : postprocess_averages,
-        'slice_index' : postprocess_slice_index
+        'index' : postprocess_index
     }
-    print(f'received attributes :: {attributes}')
     postprocessed = {
         key : func_mapping.get(key, identity)(value)
         for key, value in attributes.items()
@@ -64,12 +71,90 @@ def postprocess(attributes: dict) -> dict:
 
 
 
+class LoadingStrategy(enum.Enum):
+    LAZY = enum.auto()
+    CACHING = enum.auto()
+
+
+def is_subvolume_directory(directory: Path) -> bool:
+    """
+    Estimate on last path component whether the given directory containes
+    slices of a subvolume.
+    """
+    if directory.stem.startswith(DEFAULT_SUBVOLUME_PREFIX):
+        return True
+    return False
+
+
+
+def fingerprint_from_directory(directory: PathLike) -> InstanceFingerprint:
+    directory = Path(directory)
+    if is_subvolume_directory(directory):
+        base_directory = directory.parent
+        subvolume_directory = directory.stem
+        attributes = postprocess(
+            parse_directory_identifier(base_directory.stem)
+        )
+        index = int(subvolume_directory.split('_')[-1])
+        attributes['index'] = index
+        fingerprint = SubvolumeFingerprint(**attributes)
+    else:
+        attributes == postprocess(
+            parse_directory_identifier(directory.stem)
+        )
+        fingerprint = InstanceFingerprint(**attributes)
+    return fingerprint
+
+
+def fingerprint_from_filepath(filepath: PathLike) -> InstanceFingerprint:
+    filepath = Path(filepath)
+
+
+
+
+
+class SliceLoader:
+    """
+    Load 2D slices from a directory. 
+    """
+    suffix: str = DEFAULT_SUFFIX
+    recursive: bool = False
+    strategy: LoadingStrategy = LoadingStrategy.CACHING
+
+    def from_directory(self, directory: Path) -> list[AbstractSlice]:
+        if self.strategy is LoadingStrategy.CACHING:
+            slice_class = CachingSlice
+        else:
+            slice_class = LazySlice
+
+        slices = []
+        fingerprint = fingerprint_from_directory(directory)
+        for item in directory.iterdir():
+            try:
+                fileattributes = postprocess(
+                    parse_filename_identifier(item.name)
+                )
+            except (SyntaxError, AttributeError) as e:
+                warnings.warn(f'Malformed slice candidate: "{item}". '
+                              f'Could not parse due to: {e}')
+                continue
+            if fileattributes['suffix'] != DEFAULT_SUFFIX:
+                continue
+            slices.append(
+                slice_class(filepath=item, fingerprint=fingerprint,
+                            index=fileattributes['index'])
+            )
+        return slices
+
+
+
+
 class SubvolumeLoader:
     """
     Load a subvolume as a monlithic `numpy.ndarray` object.
     """
-    suffix: str = 'tif'
-    subvolume_directory_prefix: str = 'subvol'
+    suffix: str = DEFAULT_SUFFIX
+    subvolume_prefix: str = DEFAULT_SUBVOLUME_PREFIX
 
 
     def _from_directory(self, directory: Path, attributes: dict) -> Subvolume:
@@ -81,12 +166,12 @@ class SubvolumeLoader:
             attributes = parse_filename_identifier(element.name)
             index = attributes.pop('index')
             slices.append(
-                EagerSlice(filepath=element, fingerprint=fingerprint,
-                           index=index)
+                CachingSlice(filepath=element, fingerprint=fingerprint,
+                             index=index)
             )
         # sort by slice index
         slices = sorted(slices, key=lambda s: s.index)
-        slices = np.stack((s.data for s in slices), axis=0)
+        slices = np.stack(tuple(s.data for s in slices), axis=0)
         return Subvolume(directorypath=directory, fingerprint=fingerprint,
                          data=slices)
 
@@ -95,7 +180,8 @@ class SubvolumeLoader:
         directory = Path(directory)
         attributes = postprocess(parse_directory_identifier(directory.parent.stem))
         # directory stem is expected to have the form `subvol_{N}`
-        attributes['index'], _ = directory.stem.split('_')
+        _, index = directory.stem.split('_')
+        attributes['index'] = int(index)
         return self._from_directory(directory, attributes)
 
 
@@ -103,9 +189,9 @@ class SubvolumeLoader:
         directory = Path(directory)
         attributes = postprocess(parse_directory_identifier(directory.stem))
         attributes['index'] = index
+        # Go one level deeper
+        directory = directory / f'{self.subvolume_prefix}_{index}'
         return self._from_directory(directory, attributes)
-
-
 
 
 

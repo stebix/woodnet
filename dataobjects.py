@@ -1,7 +1,8 @@
 import dataclasses
 import numpy as np
-from typing import Optional, Union 
-import PIL
+from typing import Optional 
+
+from PIL import Image
 
 from customtypes import PathLike
 
@@ -29,7 +30,6 @@ class AbstractSlice:
     filepath: PathLike
     fingerprint: InstanceFingerprint
     index: int
-    _data: Optional[np.ndarray]
     
     @property
     def ID(self) -> int:
@@ -40,24 +40,29 @@ class AbstractSlice:
         raise NotImplementedError
     
     def _load_data(self) -> np.ndarray:
-        return np.array(PIL.Image.open(self.filepath))
+        return np.array(Image.open(self.filepath))
 
     
 @dataclasses.dataclass
 class LazySlice(AbstractSlice):
     """Lazy slice loads data on access."""
+
     @property
     def data(self) -> np.ndarray:
         return self._load_data()
     
     
 @dataclasses.dataclass
-class EagerSlice(AbstractSlice):
-    """Slice data loaded instantly upon creation."""
-    def __post__init__(self) -> None:
-        self._data = self._load_data()
-        
+class CachingSlice(AbstractSlice):
+    """Slice data loaded and cached upon request."""
+    _data: Optional[np.ndarray] = dataclasses.field(init=False,
+                                                    default=None,
+                                                    repr=False)
+    
+    @property
     def data(self) -> np.ndarray:
+        if self._data is None:
+            self._data = self._load_data()
         return self._data
     
 
