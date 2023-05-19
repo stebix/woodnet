@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional
 
 from customtypes import PathLike
-from dataobjects import SubvolumeFingerprint, EagerSlice
+from dataobjects import SubvolumeFingerprint, Subvolume, EagerSlice
 
 
 
@@ -71,32 +71,8 @@ class SubvolumeLoader:
     suffix: str = 'tif'
     subvolume_directory_prefix: str = 'subvol'
 
-    def from_directory(self, directory: PathLike) -> np.ndarray:
-        directory = Path(directory)
-        level, attributes = self.deduce_directory_level(directory)
-        if level == 'top':
-            if index is None:
-                raise ValueError(
-                    f'For given top-level directory "{directory}" a subvolume index '
-                    f'is required for disambiguation, but got None'
-                )
-            directory = directory / '_'.join((self.subvolume_directory_prefix, str(index)))
-            attributes['index'] = index
-        else:
-            pass
 
-        paths = [
-            element for element in directory.iterdir()
-            if element.name.endswith(self.suffix)
-        ]
-
-
-    def from_top_directory(self, directory: PathLike, index: int) -> np.ndarray:
-        directory = Path(directory)
-        attributes = postprocess(parse_directory_identifier(directory.stem))
-        attributes['index'] = index
-
-        directory = directory / '_'.join((self.subvolume_directory_prefix, str(index)))
+    def _from_directory(self, directory: Path, attributes: dict) -> Subvolume:
         fingerprint = SubvolumeFingerprint(**attributes)
         slices = []
         for element in directory.iterdir():
@@ -110,9 +86,24 @@ class SubvolumeLoader:
             )
         # sort by slice index
         slices = sorted(slices, key=lambda s: s.index)
-        return slices
+        slices = np.stack((s.data for s in slices), axis=0)
+        return Subvolume(directorypath=directory, fingerprint=fingerprint,
+                         data=slices)
 
 
+    def from_directory(self, directory: PathLike) -> Subvolume:
+        directory = Path(directory)
+        attributes = postprocess(parse_directory_identifier(directory.parent.stem))
+        # directory stem is expected to have the form `subvol_{N}`
+        attributes['index'], _ = directory.stem.split('_')
+        return self._from_directory(directory, attributes)
+
+
+    def from_top_directory(self, directory: PathLike, index: int) -> Subvolume:
+        directory = Path(directory)
+        attributes = postprocess(parse_directory_identifier(directory.stem))
+        attributes['index'] = index
+        return self._from_directory(directory, attributes)
 
 
 
