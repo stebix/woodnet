@@ -17,7 +17,7 @@ class InstanceFingerprint:
     averages: int
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SubvolumeFingerprint(InstanceFingerprint):
     index: int
 
