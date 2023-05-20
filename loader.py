@@ -2,12 +2,13 @@ import enum
 import warnings
 import numpy as np
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterable
 
+import tqdm
 
 from customtypes import PathLike
 from dataobjects import (SubvolumeFingerprint, Subvolume, AbstractSlice,
-                         CachingSlice, LazySlice, InstanceFingerprint)
+                         CachingSlice, LazySlice, InstanceFingerprint, Volume)
 
 
 DEFAULT_SUFFIX: str = 'tif'
@@ -148,10 +149,62 @@ class SliceLoader:
 
 
 
+def get_progressbar_wrapper(progressbar: str) -> callable:
+    """Get progressbar depending on selection."""
+    if progressbar == 'tqdm':
+        from tqdm import tqdm
+        return tqdm
+    elif progressbar =='tqdm_notebook':
+        from tqdm.notebook import tqdm_notebook as tqdm
+        return tqdm
+    elif progressbar == 'none':
+        return lambda x: x
+    else:
+        raise ValueError(f'requested invalid progressbar wrapper: '
+                         f'"{progressbar}"')
+
+
+def maybe_wrap_progressbar(iterable: Iterable, progressbar: str) -> Iterable:
+    wrapper = get_progressbar_wrapper(progressbar)
+    return wrapper(iterable)
+
+
+
+class VolumeLoader:
+    """
+    Load all slices from a directory as a monolithic `numpy.ndarray` volume.
+    """
+    suffix: str = DEFAULT_SUFFIX
+    progressbar: str = 'tqdm'
+    
+    def from_directory(self, directory: PathLike) -> Volume:
+        directory = Path(directory)
+        attributes = postprocess(parse_directory_identifier(directory.stem))
+        fingerprint = InstanceFingerprint(**attributes)
+        tifs = [
+            f for f in directory.iterdir()
+            if f.is_file() and f.name.endswith(self.suffix)
+        ]
+        slices = []
+        for f in tifs:
+            file_attributes = parse_filename_identifier(f.name)
+            index = int(file_attributes['index'])
+            slices.append(
+                CachingSlice(filepath=f, fingerprint=fingerprint, index=index)
+            )
+        slices = sorted(slices, key=lambda s: s.index)
+        # actual loading is performed in stack operation
+        slices = maybe_wrap_progressbar(slices, self.progressbar)
+        volume = np.stack(tuple(s.data for s in slices))
+        return Volume(directorypath=directory, fingerprint=fingerprint, data=volume)
+
+
+
+
 
 class SubvolumeLoader:
     """
-    Load a subvolume as a monlithic `numpy.ndarray` object.
+    Load a subvolume as a monolithic `numpy.ndarray` object.
     """
     suffix: str = DEFAULT_SUFFIX
     subvolume_prefix: str = DEFAULT_SUBVOLUME_PREFIX

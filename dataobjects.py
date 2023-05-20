@@ -66,13 +66,45 @@ class CachingSlice(AbstractSlice):
         return self._data
     
 
+
+
+def terse_data_str(cls):
+    """
+    Class decorator to use numpy.ndarrays shapes instead of full arrays inside
+    the object string representation method.
+    """
+
+    def __str__(self) -> str:
+        base = ''.join((type(self).__name__, '('))
+        s = []
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if isinstance(value, np.ndarray):
+                value_str = str(value.shape)
+            else:
+                value_str = str(value)
+            s.append(value_str)
+        s = ', '.join(s)
+        return ''.join((base, s, ')'))
+    
+    setattr(cls, '__str__', __str__)
+    return cls
+
+
+
+
 @dataclasses.dataclass
+@terse_data_str
+class Volume:
+    directorypath: PathLike
+    fingerprint: InstanceFingerprint
+    data: np.ndarray
+
+
+@dataclasses.dataclass
+@terse_data_str
 class Subvolume:
     directorypath: PathLike
     fingerprint: SubvolumeFingerprint
     data: np.ndarray
     
-    @classmethod
-    def load_from_directory(cls, directory: PathLike) -> 'Subvolume':
-        """Instantiante `Subvolume` instance directly from directory."""
-        pass

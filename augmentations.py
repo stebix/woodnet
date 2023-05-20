@@ -8,10 +8,10 @@ class Transformer:
     def __init__(self, *transforms: torch.nn.Module) -> None:
         self.transforms = transforms
 
-    def __call__(self, data: torch.Tensor) -> Any:
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
         for transform in self.transforms:
-            data = transform(data)
-        return data
+            x = transform(x)
+        return x
     
     def __str__(self) -> str:
         info_str = ''.join((self.__class__.__name__, '('))
@@ -26,4 +26,7 @@ class ScriptedTransformer:
 
     def __init__(self, *transforms: torch.nn.Module) -> None:
         self.transforms = torch.nn.Sequential(*transforms)
-        pass
+        self.scripted_transforms = torch.jit.script(self.transforms)
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return self.scripted_transforms(x)
