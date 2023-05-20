@@ -4,11 +4,9 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, Iterable
 
-import tqdm
-
-from customtypes import PathLike
 from dataobjects import (SubvolumeFingerprint, Subvolume, AbstractSlice,
                          CachingSlice, LazySlice, InstanceFingerprint, Volume)
+from custom.types import PathLike
 
 
 DEFAULT_SUFFIX: str = 'tif'
