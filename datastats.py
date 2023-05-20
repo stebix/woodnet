@@ -1,15 +1,22 @@
-from pathlib import Path
 import json
+import dataclasses
 import numpy as np
 
+from pathlib import Path
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Protocol
 
+from dataobjects import InstanceFingerprint, SubvolumeFingerprint
 from loader import parse_filename_identifier
 
 
 DEFAULT_SUFFIX: str = 'tif'
 DEFAULT_SUBVOLUME_PREFIX: str = 'subvol'
+
+
+class VolumeLike(Protocol):
+    fingerprint: InstanceFingerprint
+    data: np.ndarray
 
 
 def build_output_filename(ID: int, class_: str,
@@ -20,6 +27,17 @@ def build_output_filename(ID: int, class_: str,
     else:
         subvolume_info = 'complete'
     return f'CT-{ID}_{class_}_{subvolume_info}_statistics.json'
+
+
+def build_output_filename_from(fingerprint: InstanceFingerprint) -> str:
+    if isinstance(fingerprint, SubvolumeFingerprint):
+        subvolume = fingerprint.index
+    else:
+        subvolume = None
+    filename = build_output_filename(
+        ID=fingerprint.ID, class_=fingerprint.class_, subvolume=subvolume
+    )
+    return filename
 
 
 def is_subvolumedirectory(p: Path) -> bool:
@@ -49,6 +67,22 @@ def collect_data_directories(basedir: Path) -> dict[str, list]:
         else:
             directories['indeterminate'].append(child)
     return directories
+
+
+def compute_statistics(volume: VolumeLike) -> dict:
+    statistics = {
+        'metadata' : {
+            'fingerprint' : str(volume.fingerprint.__class__),
+            **dataclasses.asdict(volume.fingerprint)
+        }
+    }
+    statistics['minimum'] = np.min(volume.data)
+    statistics['maximum'] = np.max(volume.data)
+    statistics['mean'] = np.mean(volume.data)
+    statistics['stdev'] = np.std(volume.data)
+    statistics['voxelcount'] = volume.data.size
+    statistics['shape'] = volume.data.shape
+    return statistics
 
 
 
