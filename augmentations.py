@@ -16,8 +16,8 @@ class Transformer:
     def __str__(self) -> str:
         info_str = ''.join((self.__class__.__name__, '('))
         info_str += f'N={len(self.transforms)}'
+        return ''.join((info_str, ')'))
         
-
 
 
 

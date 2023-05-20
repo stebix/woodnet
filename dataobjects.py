@@ -4,7 +4,7 @@ from typing import Optional
 
 from PIL import Image
 
-from customtypes import PathLike
+from custom.types import PathLike
 
 
 @dataclasses.dataclass(frozen=True)
@@ -34,6 +34,10 @@ class AbstractSlice:
     @property
     def ID(self) -> int:
         return self.fingerprint.ID
+    
+    @property
+    def class_(self) -> str:
+        return self.fingerprint.class_
     
     @property
     def data() -> np.ndarray:

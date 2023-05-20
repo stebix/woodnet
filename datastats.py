@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Optional, Protocol
 
 from dataobjects import InstanceFingerprint, SubvolumeFingerprint
+from custom.types import PathLike
 
 
 DEFAULT_SUFFIX: str = 'tif'
@@ -85,7 +86,15 @@ def compute_statistics(volume: VolumeLike) -> dict:
 
 
 def export_statistics(*volumes: VolumeLike, directory: PathLike) -> None:
-    pass
+    directory = Path(directory)
+    directory.mkdir(exist_ok=True, parents=True)
+    for volume in volumes:
+        filename = build_output_filename_from(volume.fingerprint)
+        savepath = directory / filename
+        statistics = compute_statistics(volume)
+
+        with savepath.open(mode='w') as handle:
+            json.dump(statistics, handle)
 
 
 if __name__ == '__main__':
