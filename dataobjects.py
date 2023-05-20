@@ -80,14 +80,15 @@ def terse_data_str(cls):
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
             if isinstance(value, np.ndarray):
-                value_str = str(value.shape)
+                repr_value = f'(dtype={value.dtype}, shape={value.shape})'
             else:
-                value_str = str(value)
-            s.append(value_str)
+                repr_value = repr(value)
+            s.append(f'{field.name}={repr_value}')
         s = ', '.join(s)
         return ''.join((base, s, ')'))
     
     setattr(cls, '__str__', __str__)
+    setattr(cls, '__repr__', __str__)
     return cls
 
 
