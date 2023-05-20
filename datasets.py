@@ -15,8 +15,9 @@ Tensor = torch.Tensor
 
 
 class SliceDataset(torch.utils.data.Dataset):
-
-
+    """
+    Dataset consisting of many 2D slices (H x W)
+    """
     def __init__(self,
                  phase: Literal['train', 'test'],
                  slices: list[AbstractSlice],
@@ -55,8 +56,7 @@ class SliceDataset(torch.utils.data.Dataset):
         if self.phase == 'test':
             return data
 
-        label = self.classlabel_mapping[slc.class_]
-        label = torch.tensor(label)
+        label = torch.tensor(self.classlabel_mapping[slc.class_])
 
         return (data, label)
     
