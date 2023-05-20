@@ -84,6 +84,9 @@ def compute_statistics(volume: VolumeLike) -> dict:
     return statistics
 
 
+def export_statistics(*volumes: VolumeLike, directory: PathLike) -> None:
+    pass
+
 
 if __name__ == '__main__':
     pass
