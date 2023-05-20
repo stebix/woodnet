@@ -7,7 +7,6 @@ from collections import defaultdict
 from typing import Optional, Protocol
 
 from dataobjects import InstanceFingerprint, SubvolumeFingerprint
-from loader import parse_filename_identifier
 
 
 DEFAULT_SUFFIX: str = 'tif'
@@ -72,7 +71,7 @@ def collect_data_directories(basedir: Path) -> dict[str, list]:
 def compute_statistics(volume: VolumeLike) -> dict:
     statistics = {
         'metadata' : {
-            'fingerprint' : str(volume.fingerprint.__class__),
+            'fingerprint' : str(volume.fingerprint.__class__.__name__),
             **dataclasses.asdict(volume.fingerprint)
         }
     }
