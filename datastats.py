@@ -76,10 +76,12 @@ def compute_statistics(volume: VolumeLike) -> dict:
             **dataclasses.asdict(volume.fingerprint)
         }
     }
-    statistics['minimum'] = np.min(volume.data)
-    statistics['maximum'] = np.max(volume.data)
-    statistics['mean'] = np.mean(volume.data)
-    statistics['stdev'] = np.std(volume.data)
+    # Cast to float to make the values JSON-serializable.
+    # 32 bit numpy floats are not natively JSON-serializable
+    statistics['minimum'] = float(np.min(volume.data))
+    statistics['maximum'] = float(np.max(volume.data))
+    statistics['mean'] = float(np.mean(volume.data))
+    statistics['stdev'] = float(np.std(volume.data))
     statistics['voxelcount'] = volume.data.size
     statistics['shape'] = volume.data.shape
     return statistics
