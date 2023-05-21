@@ -62,6 +62,7 @@ def train(model: torch.nn.Module,
             # actual deep learning
             optimizer.zero_grad()
             prediction = model(data)
+
             loss = criterion(prediction, label)
             loss.backward()
             optimizer.step()
