@@ -64,7 +64,7 @@ class ResNet18(torch.torch.nn.Module):
     Smallish ResNet18 model.
     """
     # ResNet 18 settings, see paper
-    num_classes: int = 2
+    num_classes: int = 1
     num_layers: int = 18
     layers = [2, 2, 2, 2]
     expansion: int = 1
