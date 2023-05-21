@@ -98,7 +98,7 @@ def fingerprint_from_directory(directory: PathLike) -> InstanceFingerprint:
         attributes['index'] = index
         fingerprint = SubvolumeFingerprint(**attributes)
     else:
-        attributes == postprocess(
+        attributes = postprocess(
             parse_directory_identifier(directory.stem)
         )
         fingerprint = InstanceFingerprint(**attributes)
@@ -133,7 +133,7 @@ class SliceLoader:
                 fileattributes = postprocess(
                     parse_filename_identifier(item.name)
                 )
-            except (SyntaxError, AttributeError) as e:
+            except (SyntaxError, AttributeError, ValueError) as e:
                 warnings.warn(f'Malformed slice candidate: "{item}". '
                               f'Could not parse due to: {e}')
                 continue
