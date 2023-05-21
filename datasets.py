@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from typing import Literal, Optional, Union
 
@@ -11,6 +12,11 @@ DEFAULT_CLASSLABEL_MAPPING = {
 }
 
 Tensor = torch.Tensor
+
+
+def add_channel_dim(array: np.ndarray) -> np.ndarray:
+    """Add fake channel dimension."""
+    return array[np.newaxis, ...]
 
 
 class SliceDataset(torch.utils.data.Dataset):
@@ -47,7 +53,7 @@ class SliceDataset(torch.utils.data.Dataset):
                  ->  input [Tensor, (H x W)]
         """
         slc = self.slices[index]
-        data = torch.tensor(slc.data)
+        data = torch.tensor(add_channel_dim(slc.data))
 
         if self.transformer:
             data = self.transformer(data)
@@ -55,9 +61,9 @@ class SliceDataset(torch.utils.data.Dataset):
         if self.phase == 'test':
             return data
 
-        label = torch.tensor(self.classlabel_mapping[slc.class_])
+        label = torch.tensor(self.classlabel_mapping[slc.class_]).unsqueeze(-1)
 
-        return (data, label)
+        return (data, label.to(torch.long))
     
 
     def __len__(self) -> int:
