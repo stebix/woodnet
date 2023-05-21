@@ -1,10 +1,10 @@
 import torch
 
-
 from dataobjects import CachingSlice
 from datasets import SliceDataset
 
-def test_initialization_train_phase(tiff_generator, fingerprint):
+
+def test_basic_initialization_at_train_phase(tiff_generator, fingerprint):
     """
     Basic smoke test whether the dataset object works at all.
     """
