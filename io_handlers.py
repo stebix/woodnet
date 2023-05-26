@@ -27,5 +27,13 @@ class DirectoryHandler:
         self.checkpoints.mkdir()
 
     
-    def save_model_checkpoint(self, model: torch.nn.Module) -> None:
-        pass
+    def save_model_checkpoint(self,
+                              model: torch.nn.Module,
+                              filename: str) -> None:
+        savepath = self.checkpoints / filename
+        if savepath.exists() and not self.allow_overwrite:
+            raise FileExistsError(
+                f'Could not save model checkpoint to "{savepath}"!'
+                 'File already exists.'
+            )
+        torch.save(model.state_dict(), savepath)
