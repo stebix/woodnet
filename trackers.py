@@ -25,11 +25,21 @@ class TrackedScalar(_TrackedQuantity):
     def value(self) -> float:
         return self.current
 
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__}({self.value:.5f}, N={self.N})'
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+
+from evametrics import compute_TPR, compute_TNR, compute_ACC, compute_MCC, compute_F1
+
 
 class TrackedCardinalities(_TrackedQuantity):
 
     basal_identifiers = {'TP', 'TN', 'FP', 'FN'}
-    derived_identifiers = {'TPR', 'TNR', 'ACC', 'F1'}
+    derived_identifiers = {'TPR', 'TNR', 'ACC', 'F1', 'MCC'}
     joint_identifiers = basal_identifiers | derived_identifiers
 
     def __init__(self) -> None:
@@ -41,6 +51,7 @@ class TrackedCardinalities(_TrackedQuantity):
         self.TNR = None
         self.ACC = None
         self.F1 = None
+        self.MCC = None
 
 
     def update(self, values: Cardinalities) -> None:
@@ -50,13 +61,41 @@ class TrackedCardinalities(_TrackedQuantity):
             current = getattr(self, cardinality)
             setattr(self, cardinality, current + update)
 
-        self.TPR = self.TP / (self.TP + self.TN)
-        self.TNR = self.TN / (self.TN + self.FP)
-        numerator = self.TP + self.TN
-        denominator = self.TP + self.TN + self.FP + self.FN
-        self.ACC = numerator / denominator
-        self.F1 = 2 * self.TP / (2*self.TP + self.FP + self.FN)
+        self.TPR = compute_TPR(TP=self.TP, FN=self.FN)
+        self.TNR = compute_TNR(TN=self.TN, FP=self.FP)
+        self.ACC = compute_ACC(TP=self.TP, TN=self.TN, FP=self.FP, FN=self.FN)
+        self.F1 = compute_F1(TP=self.TP, FP=self.FP, FN=self.FN)
+        self.MCC = compute_MCC(TP=self.TP, TN=self.TN, FP=self.FP, FN=self.FN)
         
 
     def reset(self) -> None:
         self.__init__()
+
+
+    def __str__(self) -> str:
+        s = f'{self.__class__.__name__}('
+        values = [
+            '='.join((identifier, self._format_number(getattr(self, identifier))))
+            for identifier in self.joint_identifiers
+        ]
+        values = ', '.join(values)
+        return ''.join((s, values, ')'))
+
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+            
+    
+    @staticmethod
+    def _format_number(num: int | float) -> str:
+        """Conditional formatting of number string representation."""
+        if isinstance(num, int):
+            return str(num)
+        elif isinstance(num, float):
+            return f'{num:.5f}'
+        return str(num)
+
+
+
+
+

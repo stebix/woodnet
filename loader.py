@@ -155,6 +155,9 @@ def get_progressbar_wrapper(progressbar: str) -> callable:
     elif progressbar =='tqdm_notebook':
         from tqdm.notebook import tqdm_notebook as tqdm
         return tqdm
+    elif progressbar == 'tqdm_auto':
+        from tqdm.auto import tqdm
+        return tqdm
     elif progressbar == 'none':
         return lambda x: x
     else:
@@ -173,7 +176,7 @@ class VolumeLoader:
     Load all slices from a directory as a monolithic `numpy.ndarray` volume.
     """
     suffix: str = DEFAULT_SUFFIX
-    progressbar: str = 'tqdm'
+    progressbar: str = 'tqdm_auto'
     
     def from_directory(self, directory: PathLike) -> Volume:
         directory = Path(directory)
@@ -243,11 +246,6 @@ class SubvolumeLoader:
         # Go one level deeper
         directory = directory / f'{self.subvolume_prefix}_{index}'
         return self._from_directory(directory, attributes)
-
-
-
-
-
 
 
 

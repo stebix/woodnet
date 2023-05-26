@@ -84,9 +84,8 @@ def train(model: torch.nn.Module,
 import logging
 from typing import Protocol, Type
 
-class IOHandler(Protocol):
-    pass
 
+from io_handlers import IOHandler
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -103,7 +102,6 @@ class Trainer:
                  optimizer: torch.optim.Optimizer,
                  criterion: torch.nn.Module,
                  loaders: dict[str, DataLoader],
-                 metrics: Iterable[Callable[..., Tensor]],
                  io_handler: IOHandler,
                  validation_criterion: torch.nn.Module,
                  device: Union[str, torch.device],
@@ -122,9 +120,8 @@ class Trainer:
             self.device = device
         
         self.train_loader = loaders.get('train')
-        self.val_loader = loaders.get('validation')
+        self.val_loader = loaders.get('val')
 
-        self.metrics = metrics
         self.validation_criterion = validation_criterion
         self.io_handler = io_handler
         # writer receives its log directory destination from
@@ -146,6 +143,11 @@ class Trainer:
 
     def train(self) -> None:
         loader = self.train_loader
+        self.total_progress = tqdm(
+            total=self.max_num_iters, unit='it', desc='total',
+            leave=True, postfix=dict(epoch=self.epoch)
+        )
+
         for _ in range(self.max_num_epochs):
             terminated = self.train_single_epoch(loader)
 
@@ -154,7 +156,12 @@ class Trainer:
                 return None
 
             self.epoch += 1
+            self.total_progress.set_postfix(dict(epoch=self.epoch))
 
+            fname = f'mdl-epoch-{self.epoch}.pth'
+            self.io_handler.save_model_checkpoint(self.model, fname)
+
+        print('Exiting')
         return None
     
 
@@ -178,7 +185,7 @@ class Trainer:
             # data moving
             data, label = batch_data
             data = data.to(device=device, dtype=dtype, non_blocking=True)
-            label = label.to(device=device, non_blocking=True)
+            label = label.to(device=device, dtype=dtype, non_blocking=True)
             # actual deep learning
             optimizer.zero_grad()
             prediction, loss = self.forward_pass(data, label, criterion)
@@ -195,6 +202,7 @@ class Trainer:
 
             # bookkeeping
             self.iteration += 1
+            self.total_progress.update()
 
             if self.should_terminate():
                 return True
@@ -215,12 +223,13 @@ class Trainer:
         loss_tag = f'loss/training_{self.criterion.__class__.__name__}'
         self.writer.add_scalar(loss_tag, self.running_train_loss.value,
                                global_step=self.iteration)
+        sigmoid = torch.nn.Sigmoid()
         # update running metrics with current prediction and label
         with torch.no_grad():
             # TODO: maybe factor to model
-            prediction = torch.nn.Sigmoid(prediction)
+            prediction = sigmoid(prediction)
             cardinalities = compute_cardinalities(prediction, label)
-            self.running_train_metrics(cardinalities)
+            self.running_train_metrics.update(cardinalities)
         
         # report training metrics
         self.log_tracked_cardinalities(self.running_train_metrics, 'train')
@@ -232,7 +241,7 @@ class Trainer:
         
         phase = 'training' if phase == 'train' else 'validation'
         for name in tracked_cardinalities.joint_identifiers:
-            tag = f'metrics/{phase}_{name}'
+            tag = f'{phase}_metrics/{name}'
             value = getattr(tracked_cardinalities, name)
             self.writer.add_scalar(tag, value, global_step=self.iteration)
 
@@ -248,7 +257,8 @@ class Trainer:
         device = self.device
         dtype = torch.float32
         criterion = self.validation_criterion
-        wrapped_loader = tqdm(loader, unit='bt', desc='val')
+        sigmoid = torch.nn.Sigmoid()
+        wrapped_loader = tqdm(loader, unit='bt', desc='validation', leave=False)
         running_validation_loss = TrackedScalar()
         running_validation_metrics = TrackedCardinalities()
 
@@ -256,14 +266,14 @@ class Trainer:
             for batch_idx, batch_data in enumerate(wrapped_loader):
                 data, label = batch_data
                 data = data.to(device=device, dtype=dtype, non_blocking=True)
-                label = label.to(device=device, non_blocking=True)
+                label = label.to(device=device, dtype=dtype, non_blocking=True)
 
                 prediction, loss = self.forward_pass(data, label, criterion)
                 running_validation_loss.update(loss.item(), get_batchsize(data))
 
-                prediction = torch.nn.Sigmoid(prediction)
+                prediction = sigmoid(prediction)
                 cardinalities = compute_cardinalities(prediction, label)
-                running_validation_metrics(cardinalities)
+                running_validation_metrics.update(cardinalities)
         
         # report results
         loss_tag = f'loss/validation_{criterion.__class__.__name__}'
@@ -273,7 +283,7 @@ class Trainer:
 
 
     def _init_writer(self) -> SummaryWriter:
-        return self.writer_class(log_dir=self.io_handler.logs)
+        return self.writer_class(log_dir=self.io_handler.dirs.log)
 
 
 
