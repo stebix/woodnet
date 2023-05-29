@@ -8,10 +8,16 @@ from custom.exceptions import ConfigurationError
 
 
 def get_class(name: str) -> Type[torch.nn.Module]:
-    module = importlib.import_module(
-        'torchvision.transforms'
-    )
-    return getattr(module, name)
+    modules = [
+        importlib.import_module(module_name)
+        for module_name in ('torchvision.transforms', 'transform3D')
+    ]
+    for module in modules:
+        try:
+            return getattr(module, name)
+        except AttributeError:
+            continue
+    raise ConfigurationError(f'could not find class with name "{name}"')
 
 
 def from_configuration(cfg: dict, /) -> torch.nn.Module:

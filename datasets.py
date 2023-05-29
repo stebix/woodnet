@@ -1,9 +1,12 @@
 import torch
 import numpy as np
+import zarr
 
 from typing import Literal, Optional, Union
 
+from tiling import TileBuilder
 from dataobjects import AbstractSlice, Volume
+from custom.types import PathLike
 
 
 DEFAULT_CLASSLABEL_MAPPING = {
@@ -17,6 +20,11 @@ Tensor = torch.Tensor
 def add_channel_dim(array: np.ndarray) -> np.ndarray:
     """Add fake channel dimension."""
     return array[np.newaxis, ...]
+
+
+def get_spatial_shape(shape: tuple[int]) -> tuple[int]:
+    """Get spatial shape for 4D inputs"""
+    return shape[1:]
 
 
 class SliceDataset(torch.utils.data.Dataset):
@@ -121,3 +129,88 @@ class EagerSliceDataset(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return self.volume.shape[0]
+
+
+
+class TileDataset(torch.utils.data.Dataset):
+    """
+    Dataset for 3D tile based loading of the data.
+    """
+    eager: bool = True
+
+    def __init__(self,
+                 path: PathLike,
+                 phase: str,
+                 tileshape: tuple[int],
+                 transformer: Optional[callable] = None,
+                 classlabel_mapping: Optional[dict[str, int]] = None,
+                 internal_path: str = 'downsampled/half') -> None:
+
+        self.path = path
+        self.phase = phase
+        self.tileshape = tileshape
+        self.transformer = transformer
+        self.classlabel_mapping = classlabel_mapping
+        self.internal_path = internal_path
+
+        if self.phase == 'train' and classlabel_mapping is None:
+            raise RuntimeError('Training phase dataset requires a '
+                               'classlabel mapping!')
+        # underlying zarr storage with metadata fingerprint
+        self.data = zarr.convenience.open(self.path, mode='r')
+        self.fingerprint = {k : v for k, v in self.data.attrs.items()}
+        # lazily loaded volume data
+        self.volume = self.data[self.internal_path]
+
+        self.baseshape = get_spatial_shape(self.volume.shape)
+        # TODO: formalize this better
+        radius = self.baseshape[-1] // 2
+        self.tilebuilder = TileBuilder(
+            baseshape=self.baseshape, tileshape=self.tileshape,
+            radius=radius
+        )
+
+    
+    @property
+    def label(self) -> int:
+        return self.classlabel_mapping[self.fingerprint['class_']]
+
+
+    def __getitem__(self, index: int) -> tuple[Tensor] | Tensor:
+        """
+        Retrieve dataset item: tuple of tensor for training phase
+        (data and label) or test phase (single tensor).
+        """
+        tile = self.tilebuilder.tiles[index]
+        subvolume = self.volume[tile]
+        subvolume = torch.tensor(add_channel_dim(subvolume))
+
+        if self.transformer:
+            subvolume = self.transformer(subvolume)
+
+        if self.phase == 'test':
+            return subvolume
+        
+        label = torch.tensor(self.label)
+
+        return (subvolume, label)
+
+
+    def __len__(self) -> int:
+        return len(self.tilebuilder.tiles)
+    
+
+    def __str__(self) -> str:
+        has_transformer = True if self.transformer else False
+        s = f'{self.__class__.__name__}('
+        infos = ', '.join((
+            f"path='{self.path}'", f"phase='{self.phase}'",
+            f"baseshape={self.baseshape}", f"tileshape={self.tileshape}",
+            f"classlabel_mapping={self.classlabel_mapping}",
+            f"has_transformer={has_transformer}"
+        ))
+        return ''.join((s, infos, ')'))
+    
+
+    def __repr__(self) -> str:
+        return str(self)
