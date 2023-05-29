@@ -5,10 +5,16 @@ import os
 from pathlib import Path
 from itertools import chain
 
-from typing import Iterable
+from tqdm.contrib import tqdm_auto
+from typing import Iterable, Optional
 
+from datasets import TileDataset
 from loader import (LazySlice, SliceLoader, LoadingStrategy,
-                    parse_directory_identifier)
+                    VolumeLoader)
+
+from augmentations import Transformer
+from transformbuilder import from_configurations
+
 
 # WOOD_DATA_DIRECTORY = Path(os.environ.get('WOOD_DATA_DIRECTORY'))
 WOOD_DATA_DIRECTORY = Path('/home/jannik/storage/wood')
@@ -100,9 +106,48 @@ def subvolume(ID: str, index: int) -> list[LazySlice]:
 
 
 
+class TileDatasetBuilder:
+
+    internal_path: str = 'downsampled/half'
+    classlabel_mapping: dict[str, int] = {
+        'ahorn' : 0, 'kiefer' : 1
+    }
+    # TODO: factor hardcoded paths out -> bad!
+    base_directory = '/home/jannik/storage/wood/custom/'
+
+    def build(cls, *IDs: str, phase: str, tileshape: tuple[int],
+              transform_configurations: Optional[Iterable[dict]] = None
+              ) -> list[TileDataset]:
+        datasets = []
+        if transform_configurations:
+            transformer = Transformer(
+                *from_configurations(transform_configurations)
+            )
+        else:
+            transformer = None
+
+        wrapped_IDs = tqdm_auto(IDs, unit='dataset', desc='datasetbuilder')
+        for ID in wrapped_IDs:
+            wrapped_IDs.set_postfix({'current_ID' : str(ID)})
+            path = cls.get_path(ID)        
+            dataset = TileDataset(
+                path=path, phase=phase, tileshape=tileshape,
+                transformer=transformer,
+                classlabel_mapping=cls.classlabel_mapping,
+                internal_path=cls.internal_path
+            )
+            datasets.append(dataset)
+        return datasets
 
 
-
+    @classmethod
+    def get_path(cls, ID: str) -> Path:
+        base_directory = Path(cls.base_directory)
+        for child in base_directory.iterdir():
+            if child.match(f'*/{ID}*'):
+                return child
+        raise FileNotFoundError(f'could not retrieve ID "{ID}" from '
+                                f'basedir "{base_directory}"')
 
 
 

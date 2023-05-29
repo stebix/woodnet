@@ -165,9 +165,10 @@ def get_progressbar_wrapper(progressbar: str) -> callable:
                          f'"{progressbar}"')
 
 
-def maybe_wrap_progressbar(iterable: Iterable, progressbar: str) -> Iterable:
+def maybe_wrap_progressbar(iterable: Iterable, progressbar: str,
+                           kwargs: dict) -> Iterable:
     wrapper = get_progressbar_wrapper(progressbar)
-    return wrapper(iterable)
+    return wrapper(iterable, **kwargs)
 
 
 
@@ -177,6 +178,7 @@ class VolumeLoader:
     """
     suffix: str = DEFAULT_SUFFIX
     progressbar: str = 'tqdm_auto'
+    progressbar_kwargs: dict = {}
     
     def from_directory(self, directory: PathLike) -> Volume:
         directory = Path(directory)
@@ -195,7 +197,8 @@ class VolumeLoader:
             )
         slices = sorted(slices, key=lambda s: s.index)
         # actual loading is performed in stack operation
-        slices = maybe_wrap_progressbar(slices, self.progressbar)
+        slices = maybe_wrap_progressbar(slices, self.progressbar,
+                                        self.progressbar_kwargs)
         volume = np.stack(tuple(s.data for s in slices))
         return Volume(directorypath=directory, fingerprint=fingerprint, data=volume)
 

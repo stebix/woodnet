@@ -2,61 +2,9 @@ import torch
 
 from typing import Type, Optional
 
-
+from .buildingblocks import ResNetBlock
 
 Tensor = torch.Tensor
-
-
-
-
-class ResNetBlock(torch.torch.nn.Module):
-    """
-    Basic ResNet block.
-    """
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 stride: int = 1,
-                 expansion: int = 1,
-                 downsample: Optional[torch.torch.nn.Module] = None
-                 ) -> None:
-        super(ResNetBlock, self).__init__()
-        # Multiplicative factor for the subsequent
-        # intra-block expansion of the convolution layer channels
-        # It is 1 for ResNet18 and ResNet34.
-        self.expansion = expansion
-        self.downsample = downsample
-        self.conv_1 = torch.torch.nn.Conv2d(in_channels, out_channels, 
-                                            kernel_size=3, 
-                                            stride=stride, 
-                                            padding=1,
-                                            bias=False
-        )
-        self.bn_1 = torch.torch.nn.BatchNorm2d(out_channels)
-        self.relu = torch.torch.nn.ReLU(inplace=True)
-        self.conv_2 = torch.torch.nn.Conv2d(out_channels, out_channels*self.expansion, 
-                                            kernel_size=3, 
-                                            padding=1,
-                                            bias=False
-        )
-        self.bn_2 = torch.torch.nn.BatchNorm2d(out_channels*self.expansion)
-
-
-    def forward(self, x: Tensor) -> Tensor:
-        identity = x
-        # progress through the varying operations
-        out = self.conv_1(x)
-        out = self.bn_1(out)
-        out = self.relu(out)
-        out = self.conv_2(out)
-        out = self.bn_2(out)
-        if self.downsample is not None:
-            identity = self.downsample(x)
-        out = out + identity
-        out = self.relu(out)
-        return out
-    
-
 
 
 class ResNet18(torch.torch.nn.Module):
@@ -70,6 +18,7 @@ class ResNet18(torch.torch.nn.Module):
     expansion: int = 1
     conv_1_channels: int = 64
     channel_cascade = [64, 128, 256, 512]
+    _dimensionality: str = '2D'
 
     def __init__(self, 
                  in_channels: int,

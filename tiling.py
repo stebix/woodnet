@@ -193,8 +193,6 @@ def compute_tile(vertex_points: Iterable[Iterable[float]]) -> tuple[slice]:
     points of squares.
     """
     vertex_points = np.array(vertex_points)
-    print(vertex_points)
-    print(vertex_points.shape)
     
     mins = np.rint(np.min(vertex_points, axis=0))
     maxs = np.rint(np.max(vertex_points, axis=0))
@@ -238,7 +236,7 @@ def compute_z_layer_count(zsize: int, a: int) -> int:
     Parameters
     ---------
     
-    zsize : int^b
+    zsize : int
         Total extent of the volume along the z axis.
     
     a : int
@@ -278,8 +276,13 @@ class TileBuilder:
         
     radius : int
         Radius of the embedded cylinder. The cylinder is expected
-        to fill the embedding volume almost fully radius-wise, i.e.
+        to fill the embedding volume almost fully raPdius-wise, i.e.
         must be close to bondary within radius_atol.
+
+    prepend_wildcards: int, optional
+        Prepend wildcard (i.e. full selecting slice objects) for any
+        generalized dimensions such as channel or batch.
+        Defaults to 1.
     """
     radius_atol: int = 10
     packing_reltol: float = 0.01
@@ -301,7 +304,9 @@ class TileBuilder:
         self.tileshape = tileshape
         self.radius = radius
         self.a = tileshape[0]
-        self.zsize = baseshape[-1]
+        # see there big bug due to magic numbers in the frickin code
+        # FUUUUUUUUUUUUUUUUUUUUUUUUUUUUU *ragemode*
+        self.zsize = self.get_zsize(baseshape)
         self.layers = compute_z_layer_count(self.zsize, self.a)
         self.prepend_wildcards = prepend_wildcards
     
@@ -323,4 +328,24 @@ class TileBuilder:
                     tuple((*wildcards, z_slice, *tile))
                 )
         return tiles
+    
+
+    @staticmethod
+    def get_zsize(shape: tuple[int]) -> int:
+        # dimensionality interpretation:
+        # 3D : (D, H, W)
+        # 4D : (C, D, H, W)
+        # 3D : (N, C, D, H, W)
+        if len(shape) == 3:
+            return shape[0]
+        elif len(shape) == 4:
+            return shape[1]
+        elif len(shape) == 5:
+            return shape[2]
+        else:
+            raise ValueError(
+                 'expected shape for {3,4,5}-D volume but got '
+                f'{len(shape)}-D volume'
+            )
+
         

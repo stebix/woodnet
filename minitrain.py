@@ -219,7 +219,7 @@ def main(traindir_name, training_ID, validation_ID):
     export_IDs(
         train=training_ID,
         val=validation_ID,
-        handler=handler
+        handler=handler'
     )
 
     trainer = Trainer(model=model, optimizer=optimizer, criterion=criterion,

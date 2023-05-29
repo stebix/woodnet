@@ -160,7 +160,7 @@ class TileDataset(torch.utils.data.Dataset):
         self.data = zarr.convenience.open(self.path, mode='r')
         self.fingerprint = {k : v for k, v in self.data.attrs.items()}
         # lazily loaded volume data
-        self.volume = self.data[self.internal_path]
+        self.volume = self.data[self.internal_path][...]
 
         self.baseshape = get_spatial_shape(self.volume.shape)
         # TODO: formalize this better
@@ -169,6 +169,13 @@ class TileDataset(torch.utils.data.Dataset):
             baseshape=self.baseshape, tileshape=self.tileshape,
             radius=radius
         )
+    
+
+    def _load_volume(self):
+        if self.eager:
+            return self.data[self.internal_path][...]
+        else:
+            return self.data[self.internal_path]
 
     
     @property
@@ -183,7 +190,7 @@ class TileDataset(torch.utils.data.Dataset):
         """
         tile = self.tilebuilder.tiles[index]
         subvolume = self.volume[tile]
-        subvolume = torch.tensor(add_channel_dim(subvolume))
+        subvolume = torch.tensor(subvolume)
 
         if self.transformer:
             subvolume = self.transformer(subvolume)
@@ -191,7 +198,7 @@ class TileDataset(torch.utils.data.Dataset):
         if self.phase == 'test':
             return subvolume
         
-        label = torch.tensor(self.label)
+        label = torch.tensor(self.label).unsqueeze_(-1)
 
         return (subvolume, label)
 
