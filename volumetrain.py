@@ -21,21 +21,46 @@ def export_IDs(train: list, val: list, handler: IOHandler) -> None:
 
 def main():
 
+    # default fold
+    #training_IDs = [
+    #    'CT16', 'CT2', 'CT14', 'CT11', 'CT19', 'CT18', 'CT10', 'CT13',
+    #    'CT21', 'CT15', 'CT7', 'CT3', 'CT9', 'CT6', 'CT8', 'CT22'
+    #]
+    #validation_IDs = ['CT12', 'CT17', 'CT5', 'CT20']
+
+    # secondary fold
+    """
     training_IDs = [
-        'CT16', 'CT2', 'CT14', 'CT11', 'CT19', 'CT18', 'CT10', 'CT13',
-        'CT21', 'CT15', 'CT7', 'CT3', 'CT9', 'CT6', 'CT8', 'CT22'
+        f'CT{num}'
+        for num in [12, 17, 5, 20, 3, 6, 8, 9, 22, 16, 17, 2, 14, 11, 19, 13]
     ]
-    validation_IDs = ['CT12', 'CT17', 'CT5', 'CT20']
+    validation_IDs = [
+        f'CT{num}'
+        for num in [7, 21, 10, 18]
+    ]
+    """
+
+
+    # transversal only 
+    training_IDs= [
+        f'CT{num}'
+        for num in [3, 5, 7, 6, 2, 14, 11, 10]
+    ]
+    validation_IDs= [
+        f'CT{num}'
+        for num in [8, 9, 12, 13]
+    ]
+
 
     # training data settings
     tileshape = (256, 256, 256)
     training_transformer_config = [
-        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950},
-        {'name' : 'Rotate90', 'dims' : (1, 2)}
+        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950}
+        #{'name' : 'Rotate90', 'dims' : (1, 2)}
     ]
     validation_transformer_config = [
-        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950},
-        {'name' : 'Rotate90', 'dims' : (1, 2)}
+        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950}
+        #{'name' : 'Rotate90', 'dims' : (1, 2)}
     ]
 
     builder = TileDatasetBuilder()
@@ -57,7 +82,9 @@ def main():
     max_num_epochs = 75
     max_num_iters = 150000
     lr = 1e-3
-    batchsize = 8
+    batchsize = 12
+    log_after_iters: int = 50
+    validate_after_iters: int = 50
 
     loaders = {
         'train' : torch.utils.data.DataLoader(training_dataset, batch_size=batchsize,
@@ -73,7 +100,7 @@ def main():
 
     model.to(device)
 
-    traindir_name = 'run-2'
+    traindir_name = 'run-6-tv-only'
     training_dir = Path(f'/home/jannik/storage/trainruns-wood-volumetric/{traindir_name}')
     handler = IOHandler(training_dir)
 
@@ -87,8 +114,9 @@ def main():
                       loaders=loaders, io_handler=handler,
                       validation_criterion=criterion,
                       device=device, max_num_epochs=max_num_epochs,
-                      max_num_iters=max_num_iters, log_after_iters=50,
-                      validate_after_iters=50)
+                      max_num_iters=max_num_iters,
+                      log_after_iters=log_after_iters,
+                      validate_after_iters=validate_after_iters)
     
     trainer.train()
 

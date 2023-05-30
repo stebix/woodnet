@@ -4,7 +4,9 @@ import torch
 from pathlib import Path
 from tqdm.auto import tqdm
 
-from models import ResNet18
+from models.planar import ResNet18
+from models.volume import ResNet3D
+
 from trackers import TrackedScalar, TrackedCardinalities
 from evametrics import compute_cardinalities
 
@@ -17,11 +19,12 @@ def get_batchsize(tensor: Tensor) -> int:
     return tensor.shape[1]
 
 
-def load_model(path: str | Path) -> torch.nn.Module:
+def load_model(path: str | Path, dimensionality: str = '3D') -> torch.nn.Module:
     """Quickload as long as only ResNet18 exists"""
     path = Path(path)
+    model_class = ResNet18 if dimensionality == '2D' else ResNet3D
     restored_state_dict = torch.load(path)
-    model = ResNet18(in_channels=1)
+    model = model_class(in_channels=1)
     model.load_state_dict(restored_state_dict)
     return model
 

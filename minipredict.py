@@ -11,7 +11,9 @@ from transformbuilder import from_configurations
 
 def main():
     os.environ['WOOD_DATA_DIRECTORY'] = '~/jannik/storage/wood'
-    model = load_model('/home/jannik/storage/trainruns-wood-2/birthplace7/checkpoints/mdl-epoch-7.pth')
+    model = load_model(
+        '/home/jannik/storage/trainruns-wood-legacy/trainruns-wood-2/birthplace7/checkpoints/mdl-epoch-7.pth',
+        dimensionality='2D')
 
     IDs = ['CT12', 'CT17', 'CT5', 'CT20']
     classlabel_mapping = {'ahorn' : 0, 'kiefer' : 1}
