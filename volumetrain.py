@@ -44,19 +44,21 @@ def main():
     # transversal only 
     training_IDs= [
         f'CT{num}'
-        for num in [3, 5, 7, 6, 2, 14, 11, 10]
+        for num in [13, 3, 5, 7, 6, 8, 2, 14, 11, 10]
     ]
     validation_IDs= [
         f'CT{num}'
-        for num in [8, 9, 12, 13]
+        for num in [9, 12, 20, 21, 22, 16, 17, 18, 19]
     ]
 
 
     # training data settings
     tileshape = (256, 256, 256)
     training_transformer_config = [
-        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950}
-        #{'name' : 'Rotate90', 'dims' : (1, 2)}
+        {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950},
+        {'name' : 'Rotate90', 'dims' : (1, 2)},
+        {'name' : 'Rotate90', 'dims' : (0, 1)},
+        {'name' : 'Rotate90', 'dims' : (0, 2)}
     ]
     validation_transformer_config = [
         {'name' : 'Normalize3D', 'mean' : 110, 'std' : 950}
@@ -79,12 +81,12 @@ def main():
     model = ResNet3D(in_channels=1)
 
     # training parameters
-    max_num_epochs = 75
-    max_num_iters = 150000
+    max_num_epochs = 200
+    max_num_iters = 175000
     lr = 1e-3
     batchsize = 12
     log_after_iters: int = 50
-    validate_after_iters: int = 50
+    validate_after_iters: int = 125
 
     loaders = {
         'train' : torch.utils.data.DataLoader(training_dataset, batch_size=batchsize,
@@ -100,7 +102,7 @@ def main():
 
     model.to(device)
 
-    traindir_name = 'run-6-tv-only'
+    traindir_name = 'run-7-tv-aug'
     training_dir = Path(f'/home/jannik/storage/trainruns-wood-volumetric/{traindir_name}')
     handler = IOHandler(training_dir)
 

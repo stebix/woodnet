@@ -29,20 +29,24 @@ def retrieve_accumulator(path: PathLike) -> event_accumulator.EventAccumulator:
     if path.is_file():
         return event_accumulator.EventAccumulator(path=str(path))
     elif path.is_dir():
-        pass
-    else:
-        raise FileNotFoundError(
-            f'Could not find tensorboard event file at indicated location {path}'
-        )
+        logdir = path / LOGDIR_NAME
+        for item in logdir.iterdir():
+            if item.name.startswith(EVENTFILE_PREFIX):
+                return event_accumulator.EventAccumulator(path=str(item))
+    raise FileNotFoundError(
+        f'Could not find tensorboard event file at indicated location {path}'
+    )
 
 
 def retrieve_training_loss(path: PathLike) -> list[float]:
     accumulator = retrieve_accumulator(path)
+    accumulator.Reload()
     return [event.value for event in accumulator.Scalars(TRAINING_LOSS_TAG)]
 
 
 def retrieve_validation_loss(path: PathLike) -> list[float]:
     accumulator = retrieve_accumulator(path)
+    accumulator.Reload()
     return [event.value for event in accumulator.Scalars(VALIDATION_LOSS_TAG)]
 
 

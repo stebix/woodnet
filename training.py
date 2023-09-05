@@ -55,7 +55,7 @@ def train(model: torch.nn.Module,
     # torch setup
     model.train(True)
     device = torch.device(device)
-    total_pbar = tqdm(total=train_iters, unit='iter', desc='TrainIter')
+    total_pbar = tqdm(total=train_iters, unit='iter', desc='training progress')
 
     while train_iter <= train_iters:
         # epoch happens inside this loop
