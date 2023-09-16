@@ -5,10 +5,10 @@ from pathlib import Path
 from tqdm.auto import tqdm
 
 from models.planar import ResNet18
-from models.volume import ResNet3D
+from models.volumetric import ResNet3D
 
 from trackers import TrackedScalar, TrackedCardinalities
-from evametrics import compute_cardinalities
+from evaluation.metrics import compute_cardinalities
 
 
 Tensor = torch.Tensor

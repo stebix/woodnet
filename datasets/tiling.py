@@ -1,3 +1,8 @@
+"""
+Tooling for the partitioning the CT volumes via tiling.
+
+Jannik Stebani 2023
+"""
 import numpy as np
 
 from typing import Iterable, Optional
@@ -318,7 +323,7 @@ class TileBuilder:
         tile_slices = compute_tiles(*vertex_coordinates)
         z_increment = compute_z_increment(self.zsize, self.a, self.layers)
         z_slices = compute_z_slices(self.a, z_increment, self.layers)
-        # wildcards may select any frontal channel or batch dimensions
+        # wildcards may select any leading channel or batch dimensions
         wildcards = tuple(np.s_[:] for _ in range(self.prepend_wildcards))
         # expand every 2D slice tuple into the third dimension along z axis
         tiles = []

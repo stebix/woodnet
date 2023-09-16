@@ -9,7 +9,7 @@ import transformbuilder
 from datasets import SliceDataset
 from augmentations import Transformer
 from loader import SliceLoader, LoadingStrategy
-from io_handlers import IOHandler
+from directoryhandlers import IOHandler
 
 from loader import parse_directory_identifier
 from datastats import collect_data_directories

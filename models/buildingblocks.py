@@ -24,6 +24,45 @@ def fetch_batchnorm_class(dimensionality: str) -> torch.nn.Module:
 
 
 
+def create_activation(name: str, **kwargs):
+    """
+    Constructs an activation function from the name and kwargs.
+
+    Parameters
+    ----------
+
+    name : str
+        Name of activation function.
+
+    kwargs : Any
+        Keyword arguments are directly passed trough to
+        the activation.
+
+    Returns
+    -------
+
+    activation : torch.nn.Module
+        Nonlinear activation function 
+    """
+    mapping = {'relu' : torch.nn.ReLU,
+               'lrelu' : torch.nn.LeakyReLU,
+               'prelu' : torch.nn.PReLU,
+               'gelu' : torch.nn.GELU,
+               'elu' : torch.nn.ELU,
+               'celu' : torch.nn.CELU,
+               'softmax' : torch.nn.Softmax,
+               'sigmoid' : torch.nn.SiLU,
+               'mish' : torch.nn.Mish,
+               'identity' : torch.nn.Identity} 
+    try:
+        class_ = mapping[name]
+    except AttributeError:
+        raise ValueError(f'Invalid activation function name: \'{name}\'. '
+                         f'Must be o eof {mapping.keys()}')
+    return class_(**kwargs)
+
+
+
 class ResNetBlock(torch.torch.nn.Module):
     """
     Basic ResNet block.

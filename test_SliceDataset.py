@@ -1,7 +1,7 @@
 import torch
 
 from dataobjects import CachingSlice
-from datasets import SliceDataset
+from datasets.planar import SliceDataset
 
 
 def test_basic_initialization_at_train_phase(tiff_generator, fingerprint):

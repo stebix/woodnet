@@ -1,7 +1,6 @@
 import torch
 
-from evametrics import compute_cardinalities
-
+from evaluation.metrics import compute_cardinalities
 
 
 def test_optimal_classification():

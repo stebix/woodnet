@@ -3,9 +3,9 @@ import torch
 
 from pathlib import Path
 
-from models.volume import ResNet3D
+from models.volumetric import ResNet3D
 from training import Trainer
-from io_handlers import IOHandler
+from directoryhandlers import IOHandler
 from loadhelpers import TileDatasetBuilder
 
 

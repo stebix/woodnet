@@ -4,11 +4,11 @@ import torch
 
 from pathlib import Path
 
-from datasets import SliceDataset, TileDataset
 from custom.types import PathLike
-from augmentations import Transformer
-from transformbuilder import from_configurations
-import loadhelpers
+from datasets.planar import SliceDataset
+from datasets.volumetric import TileDataset
+from transformations import from_configurations
+from transformations.transformer import Transformer
 from tboardhelpers import retrieve_losses
 from prediction import load_model, Predictor
 

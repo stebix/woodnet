@@ -1,15 +1,18 @@
+import logging
 import torch
 
 from typing import Type, Optional
 
-from .buildingblocks import ResNetBlock
+from .buildingblocks import ResNetBlock, create_activation
 
 Tensor = torch.Tensor
+
+MODULE_LOGGER_NAME: str = '.'.join(('main', __name__))
 
 
 class ResNet18(torch.torch.nn.Module):
     """
-    Smallish ResNet18 model.
+    Smallish 2D ResNet18 model.
     """
     # ResNet 18 settings, see paper
     num_classes: int = 1
@@ -22,8 +25,15 @@ class ResNet18(torch.torch.nn.Module):
 
     def __init__(self, 
                  in_channels: int,
-                 block: Type[ResNetBlock] = ResNetBlock) -> None:
+                 block: Type[ResNetBlock] = ResNetBlock,
+                 final_nonlinearity: str = 'sigmoid',
+                 final_nonlinearity_kwargs: dict | None = None,
+                 testing: bool = False) -> None:
         super(ResNet18, self).__init__()
+
+        self.logger = '.'.join((MODULE_LOGGER_NAME, self.__class__.__name__))
+        self.testing = testing
+
         self.global_in_channels = in_channels
         self.in_channels = self.conv_1_channels
         
@@ -46,6 +56,9 @@ class ResNet18(torch.torch.nn.Module):
 
         self.avgpool = torch.nn.AdaptiveAvgPool2d((1, 1))
         self.fc = torch.nn.Linear(512*self.expansion, self.num_classes)
+        
+        kwargs = final_nonlinearity_kwargs or {}
+        self.final_nonlinearty = create_activation(final_nonlinearity, **kwargs)
 
 
     def _make_layer(self, block: Type[ResNetBlock], out_channels: int,
@@ -90,4 +103,8 @@ class ResNet18(torch.torch.nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, start_dim=1)
         x = self.fc(x)
+
+        if self.testing and self.final_nonlinearty is not None:
+            x = self.final_nonlinearty(x)
+
         return x

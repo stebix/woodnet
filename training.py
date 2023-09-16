@@ -1,4 +1,5 @@
 import torch
+import logging
 
 from tqdm.auto import tqdm
 from typing import Callable, Iterable, Union, Literal
@@ -59,7 +60,7 @@ def train(model: torch.nn.Module,
 
     while train_iter <= train_iters:
         # epoch happens inside this loop
-        for batch in tqdm(trainloader, unit='bt', desc='LoaderIter', leave=False):
+        for batch in tqdm(trainloader, unit='bt', desc='loader progress', leave=False):
             # data moving
             data, label = batch
             data = data.to(device=device, dtype=dtype, non_blocking=True)
@@ -85,7 +86,7 @@ import logging
 from typing import Protocol, Type
 
 
-from io_handlers import IOHandler
+from directoryhandlers import IOHandler
 
 from torch.utils.tensorboard import SummaryWriter
 

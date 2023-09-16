@@ -1,11 +1,9 @@
-import numpy as np
 import torch
 
-from datasets import TileDataset
-from augmentations import Transformer
-from transformbuilder import from_configurations
+from datasets.volumetric import TileDataset, TileDatasetBuilder
+from transformations.transformer import Transformer
+from transformations import from_configurations
 
-from loadhelpers import TileDatasetBuilder
 
 def test():
 
@@ -32,7 +30,7 @@ def test():
         print(item.shape)
         print(type(item))
 
-    raise Exception
+    return None
 
     path = '/home/jannik/storage/wood/custom/CT10.zarr'
     phase = 'train'

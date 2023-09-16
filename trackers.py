@@ -1,6 +1,8 @@
 import numpy as np
 
-from evametrics import Cardinalities
+from evaluation.metrics import (compute_TPR, compute_TNR, compute_ACC, compute_MCC,
+                                compute_F1, Cardinalities)
+
 
 class _TrackedQuantity:
     pass
@@ -31,9 +33,6 @@ class TrackedScalar(_TrackedQuantity):
     def __repr__(self) -> str:
         return self.__str__()
 
-
-
-from evametrics import compute_TPR, compute_TNR, compute_ACC, compute_MCC, compute_F1
 
 
 class TrackedCardinalities(_TrackedQuantity):

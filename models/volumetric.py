@@ -1,10 +1,13 @@
 import torch
 
-from typing import Type, Optional
+from typing import Type, Literal
 
-from .buildingblocks import ResNetBlock
+from .buildingblocks import ResNetBlock, create_activation
 
 Tensor = torch.Tensor
+
+
+MODULE_LOGGER_NAME: str = '.'.join(('main', __name__))
 
 
 class ResNet3D(torch.torch.nn.Module):
@@ -18,15 +21,23 @@ class ResNet3D(torch.torch.nn.Module):
     expansion: int = 1
     conv_1_channels: int = 64
     channel_cascade = [64, 128, 256, 512]
-    _dimensionality: str = '3D'
+    _dimensionality: Literal['3D'] = '3D'
 
     conv_class: torch.nn.Module = torch.nn.Conv3d
     norm_class: torch.nn.Module = torch.nn.BatchNorm3d
 
     def __init__(self, 
                  in_channels: int,
-                 block: Type[ResNetBlock] = ResNetBlock) -> None:
+                 block: Type[ResNetBlock] = ResNetBlock,
+                 final_nonlinearity: str = 'sigmoid',
+                 final_nonlinearty_kwargs: dict | None = None,
+                 testing: bool = False) -> None:
+
         super(ResNet3D, self).__init__()
+
+        self.logger = '.'.join((MODULE_LOGGER_NAME, self.__class__.__name__))
+        self.testing = testing
+
         self.global_in_channels = in_channels
         self.in_channels = self.conv_1_channels
 
@@ -49,6 +60,9 @@ class ResNet3D(torch.torch.nn.Module):
 
         self.avgpool = torch.nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = torch.nn.Linear(512*self.expansion, self.num_classes)
+
+        kwargs = final_nonlinearty_kwargs or {}
+        self.final_nonlinearity = create_activation(final_nonlinearity, **kwargs)
 
 
     def _make_layer(self, block: Type[ResNetBlock], out_channels: int,
@@ -94,6 +108,10 @@ class ResNet3D(torch.torch.nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, start_dim=1)
         x = self.fc(x)
+
+        if self.testing and self.final_nonlinearity is not None:
+            x = self.final_nonlinearity(x)
+
         return x
 
 

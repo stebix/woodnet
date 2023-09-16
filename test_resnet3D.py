@@ -1,7 +1,7 @@
 import torch
 
 
-from models.volume import ResNet3D
+from models.volumetric import ResNet3D
 
 s = 256
 
