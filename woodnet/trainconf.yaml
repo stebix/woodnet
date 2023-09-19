@@ -1,0 +1,66 @@
+# test training configuration
+
+experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite
+device: cuda:3
+
+model:
+  name: ResNet3D
+  in_channels: 1
+  compile:
+    enabled: True
+    dynamic: False
+    fullgraph: False
+
+optimizer:
+  name: Adam
+  learning_rate: 1e-3
+
+loss:
+  name: BCEWithLogitsLoss
+  reduction: mean
+
+trainer:
+  name: Trainer
+  log_after_iters: 1000
+  validate_after_iters: 2500
+  max_num_epochs: 100
+  max_num_iters: 175000
+
+
+loaders:
+  dataset: TileDataset
+  tileshape: [256, 256, 256]
+  batchsize: 2
+  num_workers: 32
+  pin_memory: True
+
+  train:
+    instances_ID: [CT13, CT3, CT5, CT7, CT6, CT8, CT2, CT14, CT11, CT10]
+
+
+    transform_configurations:
+
+#      - name: Normalize3D
+#       mean: 110
+#        std: 950
+    
+#      - name: Rotate90
+#        dims: [1, 2]
+
+#      - name: Rotate90
+#        dims: [0, 1]
+
+      - name: Rotate90
+        dims: [0, 2]
+
+
+  val:
+    instances_ID: [CT9, CT12, CT20, CT21, CT22, CT16, CT17, CT18, CT19]
+
+
+    transform_configurations:
+      - name: Normalize3D
+        mean: 110
+        std: 950
+
+
