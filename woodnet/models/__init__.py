@@ -41,9 +41,9 @@ def create_model(configuration: dict) -> Callable:
     model = model_class(**model_configuration) 
 
     if not compile_configuration or not compile_flag:
-        logger.debug('Sucessfully created eager model object')
+        logger.debug('Successfully created eager model object')
         return model
     else:
         model = torch.compile(model, **compile_configuration)
-        logger.debug(f'Sucessfully compiled model object with options: {compile_configuration}')
+        logger.debug(f'Successfully compiled model object with options: {compile_configuration}')
         return model

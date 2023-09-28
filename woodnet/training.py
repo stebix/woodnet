@@ -51,6 +51,7 @@ class Trainer:
                  loaders: dict[str, DataLoader],
                  handler: ExperimentDirectoryHandler,
                  validation_criterion: torch.nn.Module,
+                 validation_metric: str,
                  device: str | torch.device,
                  max_num_epochs: int,
                  max_num_iters: int,
@@ -58,7 +59,8 @@ class Trainer:
                  validate_after_iters: int,
                  use_amp: bool,
                  use_inference_mode: bool,
-                 save_model_checkpoint_every_n: int
+                 save_model_checkpoint_every_n: int,
+                 validation_metric_higher_is_better: bool = True
                  ) -> None:
 
         self.model = model
@@ -78,6 +80,10 @@ class Trainer:
         # writer receives its log directory destination from
         # io_handler instance
         self.writer = self._init_writer()
+
+        self.validation_metric = validation_metric
+        self.validation_metric_higher_is_better = validation_metric_higher_is_better
+        self.curropt_validation_metric_value = self.init_curropt_validation_metric_value()
 
         # bookkeeping
         self.max_num_epochs = max_num_epochs
@@ -259,10 +265,31 @@ class Trainer:
         self.log_tracked_cardinalities(running_validation_metrics, 'val')
         self.logger.debug(f'Concluded validation run with loss: {running_validation_loss.value}')
 
+        # save optimal model checkpoint if validation metric value is optimal
+        metric_value = getattr(running_validation_metrics, self.validation_metric)
+        self.logger.debug(
+            f'Concluded validation run with primary metric '
+            f'\'{self.validation_metric}\' = {metric_value}'
+        )
+        if self.validation_metric_higher_is_better:
+            if metric_value > self.curropt_validation_metric_value:
+                self.logger.info('Saving new validation max-optimal model checkpoint')
+                self.handler.save_model_checkpoint(self.model, 'optimal.pth', allow_overwrite=True)
+        else:
+            if metric_value < self.curropt_validation_metric_value:
+                self.logger.info('Saving new validation min-optimal model checkpoint')
+                self.handler.save_model_checkpoint(self.model, 'optimal.pth', allow_overwrite=True)
+
+
 
     def _init_writer(self) -> SummaryWriter:
         return self.writer_class(log_dir=self.handler.logdir)
 
+
+    def init_curropt_validation_metric_value(self) -> float:
+        if self.validation_metric_higher_is_better:
+            return float('-inf')
+        return float('+inf')
 
 
 def retrieve_trainer_class(name: str) -> Type[AbstractBaseTrainer]:

@@ -189,6 +189,12 @@ def create_trainer(configuration: dict,
     else:
         logger.info(f'Explicit validation criterion {validation_criterion} provided')
     
+    validation_metric = pop_logged(trainerconf, key='validation_metric', default='ACC')
+    validation_metric_higher_is_better = pop_logged(trainerconf,
+                                                    key='validation_metric_higher_is_better',
+                                                    default=True)
+    
+    logger.debug(f'Injecting remaining kwargs into trainer constructor: {trainerconf}')
     
     trainer = trainer_class(
         model=model, optimizer=optimizer, criterion=criterion,
@@ -196,7 +202,10 @@ def create_trainer(configuration: dict,
         device=device, max_num_epochs=max_num_epochs, max_num_iters=max_num_iters,
         log_after_iters=log_after_iters, validate_after_iters=validate_after_iters,
         use_amp=use_amp, use_inference_mode=use_inference_mode,
-        save_model_checkpoint_every_n=save_model_checkpoint_every_n
+        save_model_checkpoint_every_n=save_model_checkpoint_every_n,
+        validation_metric=validation_metric,
+        validation_metric_higher_is_better=validation_metric_higher_is_better,
+        **trainerconf
     )
 
     return trainer
@@ -238,7 +247,7 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
     finalize_logging_infrastructure(logger, memoryhandler, logfile_path=logfile_path)
 
     model = create_model(configuration)
-    logger.info(f'Sucessfully created model with string dump: {model}')
+    logger.info(f'Successfully created model with string dump: {model}')
 
     optimizer = create_optimizer(model, configuration)
     logger.info(f'Created optimizer: {optimizer}')
@@ -255,7 +264,7 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
     logger.info(f'Succesfully created trainer object. initializing core training loop')
     trainer.train()
 
-    logger.info('Sucesffuly concluded train method.')
+    logger.info('Succesfully concluded train method.')
 
 
 

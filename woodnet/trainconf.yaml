@@ -1,6 +1,6 @@
 # test training configuration
 
-experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite
+experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite-3
 device: cuda:3
 
 model:
@@ -25,13 +25,15 @@ trainer:
   validate_after_iters: 2500
   max_num_epochs: 100
   max_num_iters: 175000
+  validation_metric: TPR
+  validation_metric_higher_is_better: True
 
 
 loaders:
   dataset: TileDataset
   tileshape: [256, 256, 256]
   batchsize: 2
-  num_workers: 32
+  num_workers: 0
   pin_memory: True
 
   train:
@@ -40,15 +42,15 @@ loaders:
 
     transform_configurations:
 
-#      - name: Normalize3D
-#       mean: 110
-#        std: 950
-    
-#      - name: Rotate90
-#        dims: [1, 2]
+      - name: Normalize3D
+        mean: 110
+        std: 950
+   
+      - name: Rotate90
+        dims: [1, 2]
 
-#      - name: Rotate90
-#        dims: [0, 1]
+      - name: Rotate90
+        dims: [0, 1]
 
       - name: Rotate90
         dims: [0, 2]

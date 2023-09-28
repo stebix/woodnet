@@ -89,7 +89,26 @@ class ExperimentDirectoryHandler:
         return Directories(base=base, checkpoints=checkpoints, log=log)
 
     
-    def save_model_checkpoint(self, model: torch.nn.Module, name: str) -> None:
+    def save_model_checkpoint(self, model: torch.nn.Module, name: str,
+                              allow_overwrite: bool | None = None) -> None:
+        """Save model checkpoint to the checkpoint directory.
+        
+        Parameters
+        ----------
+
+        model : torch.nn.Module
+            Core model object.
+
+        name : str
+            Checkpoint file name, e.g. 'optimal.pth'
+
+        allow_overwrite : bool or None, optional
+            Set overwriting behaviour.
+            Can be used to override instance-specific setting if
+            expicit boolean is given. If set to None, then instance-wide
+            setting is used.
+            Defaults to None.
+        """
         savepath = self.checkpoints_dir / name
         if savepath.exists() and not self.allow_overwrite:
             raise FileExistsError(f'preexisting checkpoint file at \'{savepath}\'')

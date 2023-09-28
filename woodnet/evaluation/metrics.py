@@ -60,7 +60,7 @@ def compute_cardinalities(prediction: Tensor, target: Tensor,
                           ) -> Cardinalities:
     """Compute all cardinalities of the confusion matrix in one go."""
     results = {
-        'binarized' : do_binarize, 'threshold' : threshold if binarize else None,
+        'binarized' : do_binarize, 'threshold' : threshold if do_binarize else None,
         'TP' : compute_true_positive(prediction, target, do_binarize, threshold),
         'TN' : compute_true_negative(prediction, target, do_binarize, threshold),
         'FP' : compute_false_positive(prediction, target, do_binarize, threshold),
