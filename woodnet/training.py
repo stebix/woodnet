@@ -60,7 +60,7 @@ class Trainer:
                  use_amp: bool,
                  use_inference_mode: bool,
                  save_model_checkpoint_every_n: int,
-                 validation_metric_higher_is_better: bool = True
+                 validation_metric_higher_is_better: bool
                  ) -> None:
 
         self.model = model

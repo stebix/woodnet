@@ -1,7 +1,7 @@
 # test training configuration
 
-experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite-3
-device: cuda:3
+experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite-4
+device: cuda:2
 
 model:
   name: ResNet3D
@@ -23,9 +23,9 @@ trainer:
   name: Trainer
   log_after_iters: 1000
   validate_after_iters: 2500
-  max_num_epochs: 100
+  max_num_epochs: 500
   max_num_iters: 175000
-  validation_metric: TPR
+  validation_metric: ACC
   validation_metric_higher_is_better: True
 
 
@@ -46,14 +46,6 @@ loaders:
         mean: 110
         std: 950
    
-      - name: Rotate90
-        dims: [1, 2]
-
-      - name: Rotate90
-        dims: [0, 1]
-
-      - name: Rotate90
-        dims: [0, 2]
 
 
   val:
