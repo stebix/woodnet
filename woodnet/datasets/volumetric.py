@@ -7,14 +7,16 @@ import torch
 import zarr
 
 from collections.abc import Callable
+from functools import cached_property
 from torch import Tensor
 from pathlib import Path
 from typing import Iterable, Literal
 
+
 import tqdm.auto as tqdm
 
 from woodnet.custom.types import PathLike
-from woodnet.datasets import get_spatial_shape, DEFAULT_CLASSLABEL_MAPPING
+from woodnet.datasets import get_spatial_shape, DEFAULT_CLASSLABEL_MAPPING, CLASSNAME_REMAP
 from woodnet.datasets.tiling import TileBuilder
 from woodnet.transformations import from_configurations
 from woodnet.transformations.transformer import Transformer
@@ -67,9 +69,14 @@ class TileDataset(torch.utils.data.Dataset):
             return self.data[self.internal_path]
 
     
-    @property
+    @cached_property
     def label(self) -> int:
-        return self.classlabel_mapping[self.fingerprint['class_']]
+        classname = self.fingerprint['class_']
+        try:
+            classvalue = self.classlabel_mapping[classname]
+        except KeyError:
+            classvalue = self.classlabel_mapping[CLASSNAME_REMAP[classname]]
+        return classvalue
 
 
     def __getitem__(self, index: int) -> tuple[Tensor] | Tensor:
@@ -121,6 +128,7 @@ class TileDatasetBuilder:
     classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
     # TODO: factor hardcoded paths out -> bad!
     base_directory = '/home/jannik/storage/wood/custom/'
+    pretty_phase_name_map = {'val' : 'validation', 'train' : 'training'}
 
     def build(cls,
               instances_ID: Iterable[str],
@@ -136,7 +144,8 @@ class TileDatasetBuilder:
         else:
             transformer = None
 
-        desc = f'{phase} dataset build progress'
+        phase_name = cls.pretty_phase_name_map.get(phase, phase)
+        desc = f'{phase_name} dataset build progress'
         wrapped_IDs = tqdm.tqdm(instances_ID, unit='dataset', desc=desc, leave=False)
         for ID in wrapped_IDs:
             wrapped_IDs.set_postfix_str(f'current_ID=\'{ID}\'')

@@ -27,7 +27,7 @@ class IOHandler:
 
 def build_dataset_2D(IDs: list[str],
                       transformer_config: list[dict]) -> SliceDataset:
-    classlabel_mapping = {'ahorn' : 0, 'kiefer' : 1}
+    classlabel_mapping = {'acer' : 0, 'pinus' : 1}
     transformer = Transformer(*from_configurations(transformer_config))
     slices = list(loadhelpers.instances(IDs))
     dataset = SliceDataset(phase='train', slices=slices,

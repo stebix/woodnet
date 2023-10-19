@@ -3,12 +3,22 @@ Implement transformations for 3D volume data.
 
 Jannik Stebani 2023
 """
+import logging
+import time
 import random
 import torch
+import numpy as np
 
 from collections.abc import Iterable
+from typing import Any
 
 Tensor = torch.Tensor
+
+DEFAULT_LOGGER_NAME = '.'.join(('main', __name__))
+logger = logging.getLogger(DEFAULT_LOGGER_NAME)
+
+DEFAULT_SEED = int(time.time())
+logger.info(f'Using time based RNG seed {DEFAULT_SEED}')
 
 
 class Normalize3D:
@@ -37,8 +47,9 @@ class Rotate90:
     Rotate by 90 degrees in the plane defined by the two given dims axis.
     TODO: give ability to seed the torch random number generator
     """
-    def __init__(self, dims: Iterable[int]) -> None:
+    def __init__(self, dims: Iterable[int], seed: int = 123) -> None:
         self.dims = dims
+        self.seed = seed
 
     def __call__(self, x: Tensor) -> Tensor:
         k = random.randint(0, 3)
@@ -73,17 +84,100 @@ class Rotate:
         raise NotImplementedError('implement this')
 
 
-class GaussianBlur:
-    def __init__(self) -> None:
-        raise NotImplementedError('implement this')
-
 
 class GaussianNoise:
-    def __init__(self) -> None:
-        raise NotImplementedError('implement this')
+    """Additive Gaussian noise."""
+
+    def __init__(self, p_execution: float, mean: float, std: float,
+                 seed: int = 123) -> None:
+        
+        self.p_execution = p_execution
+        self.mean = mean
+        self.std = std
+        self._seed = seed
+
+    def __call__(self, x: Tensor) -> Tensor:
+        if self.p_execution < random.uniform(0, 1):
+            return x
+        
+        template = torch.ones_like(x)
+        mean = self.mean * template
+        std = self.std * template
+        noise = torch.normal(mean=mean, std=std)
+        return x + noise
+
+
+    def __str__(self) -> str:
+        s = (f'{self.__class__.__name__}(p_execution={self.p_execution:.3f}, '
+             f'mean={self.mean}, std={self.std})')
+        return s
+    
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 
 class PoissonNoise:
-    def __init__(self) -> None:
-        raise NotImplementedError('implement this')
+    """Additive Poisson noise."""
 
+    def __init__(self, p_execution: float, lambda_: float,
+                 seed: int = 123) -> None:
+        
+        self.p_execution = p_execution
+        self.lambda_ = lambda_
+        self._seed = seed
+
+    def __call__(self, x: Tensor) -> Tensor:
+        if self.p_execution < random.uniform(0, 1):
+            return x
+        
+        template = self.lambda_ * torch.ones_like(x)
+        noise = torch.poisson(template)
+        return x + noise
+
+
+    def __str__(self) -> str:
+        s = (f'{self.__class__.__name__}(p_execution={self.p_execution:.3f}, '
+             f'lambda={self.lambda_})')
+        return s
+    
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+
+class GaussianBlur:
+    
+    def __init__(self, p_execution: float, ksize: int, sigma: int,
+                 dtype: torch.dtype = torch.float32) -> None:
+
+        self.p_exectution = p_execution
+
+        if ksize % 2 == 0:
+            raise ValueError(f'kernel size should be odd, but got {ksize = }')
+        self._sigma = sigma
+        self._ksize = ksize
+        self._dtype = dtype
+    
+        self._x = np.linspace(-ksize//2, +ksize//2, num=ksize)
+        kernel = np.exp(-self._x**2 / sigma)
+        kernel = kernel / np.sum(kernel)
+        self._kernel = torch.tensor(
+            kernel[np.newaxis, np.newaxis, ...], dtype=self._dtype
+        )
+        
+
+    def __call__(self, x: Tensor) -> Tensor:
+        if self.p_exectution < random.uniform(0, 1):
+            return x
+        
+        kernel = self._kernel.to(device=x.device, dtype=x.dtype)
+        for _ in range(3):
+            x = torch.nn.functional.conv1d(x.reshape(-1, 1, x.size(2)),
+                                           weight=kernel, padding=self._ksize//2
+                ).view(*x.shape)
+            x = x.permute(2, 0, 1)
+        return x
+        

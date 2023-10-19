@@ -1,7 +1,6 @@
 # test training configuration
-
-experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/testexp-rewrite-4
-device: cuda:2
+experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/base/fold-1
+device: cuda:1
 
 model:
   name: ResNet3D
@@ -11,13 +10,16 @@ model:
     dynamic: False
     fullgraph: False
 
+
 optimizer:
   name: Adam
   learning_rate: 1e-3
 
+
 loss:
   name: BCEWithLogitsLoss
   reduction: mean
+
 
 trainer:
   name: Trainer
@@ -39,18 +41,14 @@ loaders:
   train:
     instances_ID: [CT13, CT3, CT5, CT7, CT6, CT8, CT2, CT14, CT11, CT10]
 
-
     transform_configurations:
-
       - name: Normalize3D
         mean: 110
         std: 950
    
 
-
   val:
     instances_ID: [CT9, CT12, CT20, CT21, CT22, CT16, CT17, CT18, CT19]
-
 
     transform_configurations:
       - name: Normalize3D

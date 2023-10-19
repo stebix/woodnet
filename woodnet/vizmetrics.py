@@ -70,7 +70,7 @@ def multievaluate(traindir_name: str,
         for name, configurations in transformers_configs.items()
     }
 
-    mapping = {'ahorn' : 0, 'kiefer' : 1}
+    mapping = {'acer' : 0, 'pinus' : 1}
 
     slices = list(loadhelpers.instances(IDs))
 

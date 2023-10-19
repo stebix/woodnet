@@ -9,6 +9,7 @@ from typing import Literal, Protocol, Type
 from torch.utils.tensorboard import SummaryWriter
 
 from woodnet.evaluation.metrics import compute_cardinalities
+from woodnet.extent import compute_training_extent
 from woodnet.trackers import TrackedScalar, TrackedCardinalities
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
 
@@ -43,6 +44,7 @@ class Trainer:
 
     writer_class: Type[SummaryWriter] = SummaryWriter
     dtype: torch.dtype = torch.float32
+    leave_total_progress: bool = True
 
     def __init__(self,
                  model: torch.nn.Module,
@@ -105,14 +107,14 @@ class Trainer:
         self.logger = logging.getLogger('.'.join((LOGGER_NAME, __class__.__name__)))
         
         self.logger.info(f'Moving model to device: \'{self.device}\'')
-        self.modl = self.model.to(device=self.device, dtype=self.dtype)
+        self.model = self.model.to(device=self.device, dtype=self.dtype)
 
 
     def train(self) -> None:
         loader = self.train_loader
         self.total_progress = tqdm.tqdm(
             total=self.max_num_iters, unit='it', desc='total iterations',
-            leave=True, postfix=dict(epoch=self.epoch)
+            leave=self.leave_total_progress, postfix=dict(epoch=self.epoch)
         )
         self.logger.info('Starting epoch training loop')
         for _ in range(self.max_num_epochs):
@@ -275,11 +277,14 @@ class Trainer:
             if metric_value > self.curropt_validation_metric_value:
                 self.logger.info('Saving new validation max-optimal model checkpoint')
                 self.handler.save_model_checkpoint(self.model, 'optimal.pth', allow_overwrite=True)
+                self.curropt_validation_metric_value = metric_value
+                self.logger.debug(f'Set new optimal metric value: {metric_value}')
         else:
             if metric_value < self.curropt_validation_metric_value:
                 self.logger.info('Saving new validation min-optimal model checkpoint')
                 self.handler.save_model_checkpoint(self.model, 'optimal.pth', allow_overwrite=True)
-
+                self.curropt_validation_metric_value = metric_value
+                self.logger.debug(f'Set new optimal metric value: {metric_value}')
 
 
     def _init_writer(self) -> SummaryWriter:

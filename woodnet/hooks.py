@@ -19,7 +19,7 @@ def build_logintercepted_excepthook(logger: logging.Logger,
         import traceback as tblib
 
         formatted_traceback = ''.join(tblib.format_tb(traceback))
-        logger.fatal(f'Run exited with unhandled exception: {type} :: \'{value}\'')
+        logger.fatal(f'Run exited with unhandled exception: {type} :: {value}')
         logger.fatal(f'Traceback :: {formatted_traceback}')
         logger.fatal('Exiting, sorry sir o7 !')
         previous_excepthook(type, value, traceback)

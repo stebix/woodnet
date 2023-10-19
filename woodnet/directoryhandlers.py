@@ -17,7 +17,8 @@ class Directories:
     log: Path
 
 
-def mkdir_logged(dirpath: Path, allow_preexisting: bool, name: str = '') -> Path:
+def mkdir_logged(dirpath: Path, allow_preexisting: bool,
+                 parents: bool = True, name: str = '') -> Path:
     """Log whether the indicated directory was created por already exsiting.
 
     Parameters
@@ -28,6 +29,10 @@ def mkdir_logged(dirpath: Path, allow_preexisting: bool, name: str = '') -> Path
 
     allow_preexisting : bool
         Allow preexsting directories, otherwise fail with `FileExistsError`
+    
+    parents : bool, optional
+        Create parent directories if not preexisting.
+        Defaults to False.
 
     name : str, optional
         Add indicative string of the direcory name or function to the log message.
@@ -56,8 +61,14 @@ def mkdir_logged(dirpath: Path, allow_preexisting: bool, name: str = '') -> Path
             return dirpath
         else:
             raise e
-
-    logger.info(f'Created new {name} directory \'{dirpath}\'')
+    except FileNotFoundError as e:
+        if parents:
+            logger.info(f'Creating new {name} directory \'{dirpath}\' with deep parent tree')
+            dirpath.mkdir(parents=True)
+        else:
+            raise e
+    else:
+        logger.info(f'Created new {name} directory \'{dirpath}\'')
     return dirpath
         
 

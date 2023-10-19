@@ -14,7 +14,7 @@ from woodnet.custom.types import PathLike
 
 
 class Config(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
+    model_config = pydantic.ConfigDict(arbitrary_types_allowed=True, extra='allow')
 
 
 class Model(Config):
@@ -34,10 +34,17 @@ class Trainer(Config):
     max_num_epochs: int
     max_num_iters: int
     validation_metric: str | None = None
-    use_amp: bool | None = None
-    use_inference_mode: bool | None = None
-    log_after_iters: Annotated[int, Gt(0)] | None = None
-    save_model_checkpoints_every_n: Annotated[int, Gt(0)] | None = None
+    use_amp: bool | None = True
+    use_inference_mode: bool | None = True
+    log_after_iters: Annotated[int, Gt(0)] | None = 1000
+    save_model_checkpoint_every_n: Annotated[int, Gt(0)] | None = 10000
+
+
+class Predictor(Config):
+    name: str
+    use_amp: bool | None = True
+    use_inference_mode: bool | None = True
+    
 
 
 class Transformation(Config):
@@ -69,7 +76,7 @@ class Loaders(Config):
 
 class TrainingConfiguration(Config):
     """Fully validated training configuration."""
-    experiment_directory: PathLike
+    experiment_directory: str
     device: str
     model: Model
     optimizer: Optimizer
@@ -77,9 +84,14 @@ class TrainingConfiguration(Config):
     trainer: Trainer
     loaders: Loaders
 
-    @pydantic.validator('experiment_directory')
-    def to_path(cls, v: str) -> pathlib.Path:
-        return pathlib.Path(v)
 
 
+class PredictionConfiguration(Config):
+    trained_model_path: str
+    target_directory: str
+    device: str
+    result_dict_filename: str
+
+    model: Model
+    predictor: Predictor
 

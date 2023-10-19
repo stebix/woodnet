@@ -83,10 +83,12 @@ def create_logging_infrastructure(level: Level,
 
 def finalize_logging_infrastructure(logger: logging.Logger,
                                     memoryhandler: logging.handlers.MemoryHandler,
-                                    logfile_path: pathlib.Path) -> None:
+                                    logfile_path: pathlib.Path) -> logging.FileHandler:
     """
     Finalize logger infrastructure by adding a file handler and flush-removing
     the memory handler.
+
+    Returns the attached filehandler instance.
     """
     formatter = logging.Formatter(fmt=DEFAULT_FORMAT)
     # set up new file handler
@@ -97,8 +99,10 @@ def finalize_logging_infrastructure(logger: logging.Logger,
     # transfer info to file handler and remove to avoid double logging
     memoryhandler.setTarget(filehandler)
     memoryhandler.flush()
-    memoryhandler.close()
+    # memoryhandler.close()
     logger.removeHandler(memoryhandler)
+
+    return filehandler
 
 
     

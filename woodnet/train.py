@@ -1,24 +1,31 @@
+import os
 import torch
 import logging
+import warnings
+import tqdm.auto as tqdm
 
 from copy import deepcopy
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Hashable, Literal
 from pathlib import Path
 
 from woodnet.models import create_model
 from woodnet.custom.exceptions import ConfigurationError
-from woodnet.datasets.volumetric import TileDataset, TileDatasetBuilder
+from woodnet.datasets.volumetric import TileDatasetBuilder
 from woodnet.training import AbstractBaseTrainer, retrieve_trainer_class
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
-from woodnet.configtools import load_yaml
+from woodnet.configtools import load_yaml, backup_configuration
 from woodnet.hooks import install_loginterceptor_excepthook
+from woodnet.logtools import (create_logging_infrastructure, finalize_logging_infrastructure,
+                              create_logfile_name)
+from woodnet.extent import compute_training_extent
 
 DataLoader = torch.utils.data.DataLoader
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
+BACKUP_CONFIGURATION_FILE: bool = bool(os.environ.get('BACKUP_CONFIGURATION_FILE', default=1))
 
 def create_optimizer(model: Callable | torch.nn.Module,
                      configuration: dict) -> torch.optim.Optimizer:
@@ -154,7 +161,8 @@ def create_trainer(configuration: dict,
                    optimizer: torch.optim.Optimizer,
                    criterion: torch.nn.Module,
                    loaders: dict[str, DataLoader],
-                   validation_criterion: Callable | None = None
+                   validation_criterion: Callable | None = None,
+                   leave_total_progress: bool = True
                    ) -> AbstractBaseTrainer:
     
     if 'trainer' not in configuration:
@@ -171,10 +179,19 @@ def create_trainer(configuration: dict,
     trainer_class_name = pop_logged(trainerconf, key='name', default='Trainer', prefix='trainer_class')
     trainer_class = retrieve_trainer_class(trainer_class_name)
     logger.info(f'Using trainer class: {trainer_class}')
+    trainer_class.leave_total_progress = leave_total_progress
+    logger.info(f'Using setting leave_total_progress: {leave_total_progress}')
 
-    # retrieve other required information
-    max_num_epochs = trainerconf.pop('max_num_epochs')
-    max_num_iters = trainerconf.pop('max_num_iters')
+    trainloader = loaders.get('train')
+    batchsize = trainloader.batch_size
+    # extract configuration values for extent specification
+    conf_max_num_epochs = pop_logged(trainerconf, key='max_num_epochs', default=None)
+    conf_max_num_iters = pop_logged(trainerconf, key='max_num_iters', default=None)
+    conf_gradient_budget = pop_logged(trainerconf, key='gradient_budget', default=None)
+    extent = compute_training_extent(loader_length=len(trainloader), max_num_epochs=conf_max_num_epochs,
+                                     max_num_iters=conf_max_num_iters, gradient_budget=conf_gradient_budget,
+                                     batchsize=batchsize)
+    logger.info(extent)
 
     log_after_iters = pop_logged(trainerconf, 'log_after_iters', default=250)
     validate_after_iters = pop_logged(trainerconf, 'validate_after_iters', default=1000)
@@ -199,7 +216,7 @@ def create_trainer(configuration: dict,
     trainer = trainer_class(
         model=model, optimizer=optimizer, criterion=criterion,
         loaders=loaders, handler=handler, validation_criterion=validation_criterion,
-        device=device, max_num_epochs=max_num_epochs, max_num_iters=max_num_iters,
+        device=device, max_num_epochs=extent.max_num_epochs, max_num_iters=extent.max_num_iters,
         log_after_iters=log_after_iters, validate_after_iters=validate_after_iters,
         use_amp=use_amp, use_inference_mode=use_inference_mode,
         save_model_checkpoint_every_n=save_model_checkpoint_every_n,
@@ -209,9 +226,6 @@ def create_trainer(configuration: dict,
     )
 
     return trainer
-
-from woodnet.logtools import (create_logging_infrastructure, finalize_logging_infrastructure,
-                              create_logfile_name)
 
 
 def run_training_experiment(configuration: dict | Path | str) -> None:
@@ -243,6 +257,11 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
 
     handler = ExperimentDirectoryHandler(configuration['experiment_directory'])
 
+    if BACKUP_CONFIGURATION_FILE:
+        backup_path = backup_configuration(configuration, handler, force_write=False)
+        logger.debug(f'Sucessfully stored backup configuration at \'{backup_path}\'')
+
+
     logfile_path = handler.logdir / create_logfile_name()
     finalize_logging_infrastructure(logger, memoryhandler, logfile_path=logfile_path)
 
@@ -259,12 +278,123 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
 
     trainer = create_trainer(configuration=configuration, model=model, optimizer=optimizer,
                              criterion=criterion, loaders=loaders, handler=handler,
-                             validation_criterion=None)
+                             validation_criterion=None,
+                             leave_total_progress=True)
 
     logger.info(f'Succesfully created trainer object. initializing core training loop')
     trainer.train()
 
     logger.info('Succesfully concluded train method.')
+
+
+def crawl_configurations(directory: Path, /) -> list[dict]:
+    results = []
+    for item in directory.iterdir():
+        if item.suffix in {'.yaml', '.yml'}:
+            logger.info(f'Loaded element \'{item}\' during configuration crawling')
+            results.append(load_yaml(item))
+        else:
+            logger.debug(f'Ignored element \'{item}\' during configuration crawling')
+    return results
+
+
+def precheck_configuration_batch(configurations: Iterable[dict]) -> None:
+    """Perform existence of experiment directory and device homogeneity precheck."""
+    devices = []
+    for configuration in configurations:
+        if 'experiment_directory' not in configuration:
+            raise ConfigurationError('missing required experiment directory specification')
+        devices.append(configuration['device'])
+    devices = set(devices)
+    if len(devices) > 1:
+        warnings.warn(f'Experiment batch runs on multiple devices: {devices}! Make '
+                      f'sure to properly coordinate resources to avoid device contention.')
+
+
+def actualize_configurations(configurations: Iterable[dict | Path | str]) -> list[dict]:
+    configurations = list(configurations)
+    actualized = []
+    for i, configuration in enumerate(configurations):
+        if isinstance(configuration, (str, Path)):
+            path = Path(configuration)
+
+            if path.is_file():
+                logger.debug(f'Loading configuration {i}/{len(configurations)} from file '
+                             f'system location \'{configuration}\'')
+                actualized.append(load_yaml(configuration))
+
+            elif path.is_dir():
+                logger.debug(f'Discovering configurations in directory \'{path}\'')
+                actualized.extend(crawl_configurations(path))
+            
+            else:
+                logger.debug(f'Ignored nonexisting configuration location \'{path}\'')
+
+        else:
+            actualized.append(configuration)
+    return actualized
+
+
+
+def run_training_experiment_batch(configurations: Iterable[dict | Path | str]) -> None:
+
+    levels = {
+        'DEBUG' : logging.DEBUG,
+        'INFO' : logging.INFO,
+        'WARNING' : logging.WARNING,
+        'ERROR' : logging.ERROR,
+        'CRITICAL' : logging.CRITICAL
+    }
+
+    stream_log_level = levels.get(os.environ.get('STREAM_LOG_LEVEL', None), logging.ERROR)
+
+    level = logging.DEBUG
+    logger, streamhandler, memoryhandler = create_logging_infrastructure(level=level,
+                                                                         streamhandler_level=stream_log_level)
+
+    install_loginterceptor_excepthook(logger)
+
+    configurations = actualize_configurations(configurations)
+    precheck_configuration_batch(configurations)
+
+    # TODO: Remove this in production
+    ExperimentDirectoryHandler.allow_preexisting_dir = True
+    ExperimentDirectoryHandler.allow_overwrite = True
+    kwargs = {'desc' : 'configuration batch progress', 'leave' : True, 'unit' : 'conf'}
+    for configuration in tqdm.tqdm(configurations, **kwargs):
+
+        handler = ExperimentDirectoryHandler(configuration['experiment_directory'])
+
+        if BACKUP_CONFIGURATION_FILE:
+            backup_path = backup_configuration(configuration, handler, force_write=False)
+            logger.debug(f'Sucessfully stored backup configuration at \'{backup_path}\'')
+
+        logfile_path = handler.logdir / create_logfile_name()
+        filehandler = finalize_logging_infrastructure(logger, memoryhandler, logfile_path=logfile_path)
+
+        model = create_model(configuration)
+        logger.info(f'Successfully created model with string dump: {model}')
+
+        optimizer = create_optimizer(model, configuration)
+        logger.info(f'Created optimizer: {optimizer}')
+
+        criterion = create_loss(configuration)
+        logger.info(f'Created criterion: {criterion}')
+
+        loaders = create_loaders(configuration)
+
+        trainer = create_trainer(configuration=configuration, model=model, optimizer=optimizer,
+                                 criterion=criterion, loaders=loaders, handler=handler,
+                                 validation_criterion=None,
+                                 leave_total_progress=False)
+
+        logger.info(f'Succesfully created trainer object. initializing core training loop')
+        trainer.train()
+        logger.info('Succesfully concluded train method.')
+
+        # logging handler cleanup to avoid double logging
+        logger.removeHandler(filehandler)
+        logger.addHandler(memoryhandler)
 
 
 
