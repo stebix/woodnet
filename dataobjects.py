@@ -77,7 +77,7 @@ def terse_data_str(cls):
     Class decorator to use numpy.ndarrays shapes instead of full arrays inside
     the object string representation method.
     """
-
+    
     def __str__(self) -> str:
         base = ''.join((type(self).__name__, '('))
         s = []

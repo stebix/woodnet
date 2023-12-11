@@ -155,6 +155,9 @@ def get_progressbar_wrapper(progressbar: str) -> callable:
     elif progressbar =='tqdm_notebook':
         from tqdm.notebook import tqdm_notebook as tqdm
         return tqdm
+    elif progressbar == 'tqdm_auto':
+        from tqdm.auto import tqdm
+        return tqdm
     elif progressbar == 'none':
         return lambda x: x
     else:
@@ -162,9 +165,10 @@ def get_progressbar_wrapper(progressbar: str) -> callable:
                          f'"{progressbar}"')
 
 
-def maybe_wrap_progressbar(iterable: Iterable, progressbar: str) -> Iterable:
+def maybe_wrap_progressbar(iterable: Iterable, progressbar: str,
+                           kwargs: dict) -> Iterable:
     wrapper = get_progressbar_wrapper(progressbar)
-    return wrapper(iterable)
+    return wrapper(iterable, **kwargs)
 
 
 
@@ -173,7 +177,8 @@ class VolumeLoader:
     Load all slices from a directory as a monolithic `numpy.ndarray` volume.
     """
     suffix: str = DEFAULT_SUFFIX
-    progressbar: str = 'tqdm'
+    progressbar: str = 'tqdm_auto'
+    progressbar_kwargs: dict = {}
     
     def from_directory(self, directory: PathLike) -> Volume:
         directory = Path(directory)
@@ -192,7 +197,8 @@ class VolumeLoader:
             )
         slices = sorted(slices, key=lambda s: s.index)
         # actual loading is performed in stack operation
-        slices = maybe_wrap_progressbar(slices, self.progressbar)
+        slices = maybe_wrap_progressbar(slices, self.progressbar,
+                                        self.progressbar_kwargs)
         volume = np.stack(tuple(s.data for s in slices))
         return Volume(directorypath=directory, fingerprint=fingerprint, data=volume)
 
@@ -243,11 +249,6 @@ class SubvolumeLoader:
         # Go one level deeper
         directory = directory / f'{self.subvolume_prefix}_{index}'
         return self._from_directory(directory, attributes)
-
-
-
-
-
 
 
 

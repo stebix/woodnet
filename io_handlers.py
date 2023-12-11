@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import torch
 
@@ -5,35 +6,43 @@ from pathlib import Path
 
 from custom.types import PathLike
 
-class DirectoryHandler:
+
+@dataclasses.dataclass
+class Directories:
+    base: Path
+    checkpoint: Path
+    log: Path
+
+
+class IOHandler:
     allow_preexisting_dir: bool = False
     allow_overwrite: bool = False
+
+    logdir_name: str = 'logs'
+    checkpointdir_name: str = 'checkpoints'
 
     def __init__(self,
                  directory: PathLike) -> None:
         
-        self.directory = Path(directory)
-        self.directory.mkdir(exist_ok=self.allow_preexisting_dir)
+        self.dirs = self.initialize_directories(directory)
 
 
-    def initialize_subdirectories(self) -> None:
-        log_dir = 'logs'
-        checkpoint_dir = 'checkpoints'
+    def initialize_directories(self, base) -> None:
+        base = Path(base)
+        base.mkdir(exist_ok=self.allow_preexisting_dir)
 
-        self.logs = self.directory / log_dir
-        self.logs.mkdir()
+        log = base / self.logdir_name
+        log.mkdir()
 
-        self.checkpoints = self.directory / checkpoint_dir
-        self.checkpoints.mkdir()
+        checkpoint = base / self.checkpointdir_name
+        checkpoint.mkdir()
+
+        return Directories(base=base, checkpoint=checkpoint, log=log)
+
 
     
-    def save_model_checkpoint(self,
-                              model: torch.nn.Module,
-                              filename: str) -> None:
-        savepath = self.checkpoints / filename
-        if savepath.exists() and not self.allow_overwrite:
-            raise FileExistsError(
-                f'Could not save model checkpoint to "{savepath}"!'
-                 'File already exists.'
-            )
+    def save_model_checkpoint(self, model: torch.nn.Module, name: str) -> None:
+        savepath = self.dirs.checkpoint / name
+        if savepath.exists():
+            raise FileExistsError(f'cannot save model at "{savepath}"')
         torch.save(model.state_dict(), savepath)
