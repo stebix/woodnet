@@ -45,27 +45,6 @@ def softcheck_filename(filepath: Path, /, action_verb: str = 'encountered') -> N
         logger.warning(f'{action_verb} checkpoint file with unusual file suffix: \'{filepath.suffix}\'')
 
 
-def load(filepath: str | Path) -> Any:
-    """Load a checkpoint file.
-
-    Basically invokes `torch.load` after soft-checking the file name and suffix.
-    """
-    filepath = Path(filepath)
-    softcheck_filename(filepath, action_verb='loading')
-    return torch.load(filepath)
-
-
-def delete(filepath: str | Path) -> None:
-    filepath = Path(filepath)
-    softcheck_filename(filepath, action_verb='deleting')
-    filepath.unlink(missing_ok=False)
-
-
-def store(filepath: str | Path, /, force: bool = False) -> None:
-    filepath = Path(filepath)
-    softcheck_filename(filepath, action_verb='storing')
-
-
 @dataclass
 class RWDHandler:
     "Read - Write - Delete - Handler `CRDHandler` for checkpoint files."""
