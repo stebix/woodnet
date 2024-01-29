@@ -1,4 +1,5 @@
 import argparse
+import rich
 
 from woodnet.configtools.foldgeneration import refold_file
 
@@ -40,7 +41,7 @@ def main() -> None:
                                 strategy=args.strategy, foldnum=args.foldnum,
                                 validate=validate, force_write=force_write)
     
-    print(configuration)
+    rich.print(configuration)
 
     
 

@@ -18,9 +18,9 @@ def get_class(name: str) -> Type[torch.nn.Module]:
     """
     Get class object for a transformation by its string name.
     """
-    module_names = ('torchvision.transforms',
-                    'woodnet.transformations.transforms',
-                    'woodnet.transformations.container')
+    module_names = ('woodnet.transformations.transforms',
+                    'woodnet.transformations.container',
+                    'torchvision.transforms')
     modules = [
         importlib.import_module(module_name)
         for module_name in module_names

@@ -100,7 +100,7 @@ def generate_fold_directory(p: PathLike, foldnum: int) -> str:
         warnings.warn(message, category=UserWarning)
         dirpath = p / f'fold-{foldnum}'
     else:
-        dirpath = p.parents[1] / f'{prefix}-{foldnum}'
+        dirpath = p.parent / f'{prefix}-{foldnum}'
     return str(dirpath)
 
 

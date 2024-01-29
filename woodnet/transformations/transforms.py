@@ -6,11 +6,11 @@ Jannik Stebani 2023
 import logging
 import time
 import random
-import torch
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 from collections.abc import Iterable
-from typing import Any
 
 Tensor = torch.Tensor
 
@@ -60,10 +60,12 @@ class Rotate90:
         if x.ndim == 3:
             y = torch.rot90(x, k, dims=self.dims)
         elif x.ndim == 4:
-            y = torch.stack([
-                torch.rot90(x[c, ...], k, dims=self.dims)
-                for c in range(x.shape[0])
-            ])
+            y = torch.stack(
+                [
+                    torch.rot90(x[c, ...], k, dims=self.dims)
+                    for c in range(x.shape[0])
+                ]
+            )
         else:
             raise ValueError(f'expected 3D or 4D tensor but got shape {x.shape}')
         return y
@@ -147,13 +149,22 @@ class PoissonNoise:
         return str(self)
 
 
+def convolve(x: Tensor, kernel: Tensor, padding: int) -> Tensor:
+    """Compute 3D convolution as series of 1D convolution: separation theorem."""
+    for _ in range(3):
+        x = F.conv1d(x.reshape(-1, 1, x.size(2)), weight=kernel, padding=padding).view(*x.shape)
+        x = x.permute(2, 0, 1)
+    return x
+
 
 class GaussianBlur:
-    
+    """
+    Stochastically apply Gaussian blur to 4D or 5D ([N x] C x D x H x W) tensors.
+    """
     def __init__(self, p_execution: float, ksize: int, sigma: int,
                  dtype: torch.dtype = torch.float32) -> None:
 
-        self.p_exectution = p_execution
+        self.p_execution = p_execution
 
         if ksize % 2 == 0:
             raise ValueError(f'kernel size should be odd, but got {ksize = }')
@@ -170,14 +181,26 @@ class GaussianBlur:
         
 
     def __call__(self, x: Tensor) -> Tensor:
-        if self.p_exectution < random.uniform(0, 1):
+        """Execute transformation on tensor."""
+        if x.ndim not in {3, 4}:
+            raise ValueError(f'tensor must be 3D or 4D of ([C x] D x H x W) layout, but '
+                             f'got ndim = {x.ndim}')
+            
+        if self.p_execution < random.uniform(0, 1):
             return x
         
         kernel = self._kernel.to(device=x.device, dtype=x.dtype)
-        for _ in range(3):
-            x = torch.nn.functional.conv1d(x.reshape(-1, 1, x.size(2)),
-                                           weight=kernel, padding=self._ksize//2
-                ).view(*x.shape)
-            x = x.permute(2, 0, 1)
+        
+        if x.ndim == 3:
+            # perform 3D convolution as series of 1D convoltuions -> separability theorem
+            for _ in range(3):
+                x = convolve(x, kernel, padding=self._ksize//2)
+        else:
+            channels = []
+            for c in range(x.size(0)):
+                v = x[c, ...]
+                channels.append(convolve(v, kernel, padding=self._ksize//2))
+                
+            x = torch.stack(channels, dim=0)
         return x
         
