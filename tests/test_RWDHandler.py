@@ -4,7 +4,7 @@ import torch
 from functools import partial
 from pathlib import Path
 
-from woodnet.checkpointhandler import RWDHandler, generate_filename
+from woodnet.checkpoint.handlers import RWDHandler, generate_filename
 
 MAGIC_WEIGHT_VALUE: float = 1701.0
 

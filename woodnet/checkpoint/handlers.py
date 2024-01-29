@@ -13,6 +13,7 @@ logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 CHECKPOINT_FILE_SUFFIX: str = 'pth'
 DEFAULT_PREFIX: str = 'chkpt'
 
+
 def generate_filename(prefix: str | None = None, qualifier: str | None = None) -> str:
     """Generate filename for checkpoint"""
     prefix = prefix or DEFAULT_PREFIX

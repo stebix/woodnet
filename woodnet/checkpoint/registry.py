@@ -8,7 +8,7 @@ from numbers import Number
 
 
 from woodnet.checkpoint import ScoredCheckpoint
-from woodnet.checkpointhandler import RWDHandler
+from woodnet.checkpoint.handlers import RWDHandler
 
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
