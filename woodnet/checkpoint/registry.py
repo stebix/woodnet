@@ -5,7 +5,7 @@ import torch
 from enum import Enum
 from functools import cached_property
 from numbers import Number
-
+from datetime import datetime
 
 from woodnet.checkpoint import ScoredCheckpoint
 from woodnet.checkpoint.handlers import RWDHandler
@@ -79,7 +79,6 @@ class Registry:
         """Return the current optimal score of all registry elements."""
         if self.population == 0:
             return self.inital_score
-        
         return self.score_optimality_function(self.scores)
 
     def current_max_score(self) -> Number:
@@ -171,22 +170,17 @@ class Registry:
     
     def __str__(self) -> str:
         return repr(self)
+    
+
+    def emit_scoresheet(self) -> dict:
+        timestamp: str = datetime.now().isoformat(timespec='milliseconds')
+        data = {
+            'timestamp' : timestamp,
+            'capacity' : self.capacity,
+            'score_preference' : self._score_preference.value,
+            'scores' : {
+                str(chkpt.filepath) : chkpt.score for chkpt in self._content
+            }
+        }
+        return data
         
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

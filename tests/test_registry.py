@@ -1,12 +1,19 @@
-import logging
 import pytest
 import torch
 import numpy as np
+import math
 
 from functools import partial
 
 from woodnet.checkpoint.handlers import RWDHandler
 from woodnet.checkpoint.registry import Registry, ScorePreference
+
+
+def is_posinf(value):
+    return math.isinf() and value > 0
+
+def is_neginf(value):
+    return math.isinf() and value < 0
 
 
 def init(module, value):
@@ -104,3 +111,41 @@ def test_registry_population_does_not_exceed_capacity(model, tmp_path):
     wasteitem = registry.register(item=(0.9, model))
     assert registry.population <= capacity
     assert np.isclose(wasteitem.score, 0.4)
+
+
+@pytest.mark.parametrize(('preference', 'infcheck_func'),
+                         [(ScorePreference.HIGHER_IS_BETTER, is_neginf),
+                           (ScorePreference.LOWER_IS_BETTER, is_posinf)])
+def test_returns_initial_scores_on_empty_registry(tmp_path, preference, infcheck_func):
+    handler = RWDHandler(directory=tmp_path)
+    registry = Registry(capacity=3, score_preference=preference,
+                        rwd_handler=handler)
+    assert infcheck_func(registry.current_min_score)
+    assert infcheck_func(registry.current_max_score)
+
+
+def test_emit_scoresheet(tmp_path, model):
+    cap = 3
+    handler = RWDHandler(directory=tmp_path)
+    preference = ScorePreference.HIGHER_IS_BETTER
+    registry = Registry(capacity=cap, score_preference=preference,
+                        rwd_handler=handler)
+    
+    # add fake checkpoint data
+    preset_scores = (0.4, 0.3, 0.75, 0.95)
+    for score in preset_scores:
+        registry.register(item=(score, model))
+
+    scoresheet = registry.emit_scoresheet()
+    
+    assert isinstance(scoresheet, dict)
+    assert scoresheet['capacity'] == cap
+
+    # get scores from the scoresheet and compare the sorted sequences
+    scores = tuple(
+        sorted([s for s in scoresheet['scores'].values()])
+    )
+    expected_scores = tuple(sorted(preset_scores))[1:]
+    assert scores == expected_scores
+
+

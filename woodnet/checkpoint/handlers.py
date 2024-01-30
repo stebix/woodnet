@@ -1,10 +1,11 @@
 import uuid
 import logging
 import torch
+import json
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Mapping
 
 
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
@@ -39,7 +40,7 @@ def softcheck_filename(filepath: Path, /, action_verb: str = 'encountered') -> N
         Insert an approriate action verb to customize the log message.
         Defaults to the generic verb 'encountered'.
     """
-    if not filepath.name.startswith('checkpoint'):
+    if not filepath.name.startswith(DEFAULT_PREFIX):
         logger.warning(f'{action_verb} checkpoint file with unusual name prefix: \'{filepath.name}\'')
     if not filepath.suffix.endswith(CHECKPOINT_FILE_SUFFIX):
         logger.warning(f'{action_verb} checkpoint file with unusual file suffix: \'{filepath.suffix}\'')
@@ -78,6 +79,18 @@ class RWDHandler:
         logger.info(f'succesfully saved checkpoint file to location \'{savepath}\'')
         return savepath
 
+
+    def write_json(self, data: Mapping, filename: str) -> Path:
+        """Write data in Mapping-like format into a JSON file with the given filename."""
+        savepath = self.directory / filename
+        if savepath.exists():
+            raise FileExistsError(f'cannot write JSON file to location \'{savepath}\' - '
+                                  f'location already exists')
+        with savepath.open(mode='w') as handle:
+            json.dump(data, fp=handle)
+        logger.info(f'successfully written JSON to location \'{savepath}\'')
+        return savepath
+        
 
     def check_working_directory(self, path: Path) -> None:
         if not path.parent == self.directory:

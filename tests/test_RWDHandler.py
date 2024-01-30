@@ -1,5 +1,6 @@
 import pytest
 import torch
+import json
 
 from functools import partial
 from pathlib import Path
@@ -105,3 +106,26 @@ def test_delete_nonexisting_file_by_name(tmp_path):
     assert not nonexisting_savepath.exists(), 'file should not exist: test setup failure'
     with pytest.raises(FileNotFoundError):
         handler.delete(name=nonexisting_savepath.name)
+
+
+def test_write_json(tmp_path):
+    expected_data = {
+        'who am i' : 'groot',
+        'age' : 42,
+        'ship' : {
+            'name' : 'uss enterprise',
+            'class' : 'sovereign',
+            'phaser banks' : '5 mark 2',
+            'torpedo launcher type' : 'quantum'
+        }
+    }
+    filename = 'data-test.json'
+    expected_filepath = tmp_path / filename
+    handler = RWDHandler(directory=tmp_path)
+
+    handler.write_json(expected_data, filename=filename)
+
+    with expected_filepath.open(mode='r') as handle:
+        data = json.load(fp=handle)
+
+    assert data == expected_data, 'write <-> read data mismatch'
