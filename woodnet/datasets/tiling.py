@@ -338,9 +338,9 @@ class TileBuilder:
     @staticmethod
     def get_zsize(shape: tuple[int]) -> int:
         # dimensionality interpretation:
-        # 3D : (D, H, W)
-        # 4D : (C, D, H, W)
-        # 3D : (N, C, D, H, W)
+        # 3D :       (D, H, W)
+        # 4D :    (C, D, H, W)
+        # 5D : (N, C, D, H, W)
         if len(shape) == 3:
             return shape[0]
         elif len(shape) == 4:

@@ -96,7 +96,7 @@ class ExperimentDirectoryHandler:
         log = base / self.logdir_name
         mkdir_logged(log, self.allow_preexisting_dir, 'log')
         checkpoints = base / self.checkpointdir_name
-        mkdir_logged(checkpoints, self.allow_preexisting_dir, 'chekpoints')
+        mkdir_logged(checkpoints, self.allow_preexisting_dir, 'checkpoints')
         return Directories(base=base, checkpoints=checkpoints, log=log)
 
     
