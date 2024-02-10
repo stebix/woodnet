@@ -3,9 +3,7 @@ Tools to adjust cross validation folds/splits in configuration objects and files
 
 @jsteb 2023
 """
-import numpy as np
-import sklearn.model_selection as skml
-import warnings
+import logging
 
 from copy import deepcopy
 from collections.abc import Callable, Iterable, Mapping
@@ -17,6 +15,9 @@ from woodnet.custom.types import PathLike
 
 
 ConfigurationLike = Mapping | TrainingConfiguration
+
+DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
+logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
 
 def set_instances_ID_mapping(configuration: dict,
@@ -71,7 +72,7 @@ def parse_fold_directory(path: PathLike) -> tuple[str, int]:
     try:
         prefix, foldnum = path.name.split('-')
     except ValueError as e:
-        raise ValueError(f'Could not split tentative fold directory \'{path.name}\'') from e
+        raise ValueError(f'Could not split tentative fold directory: \'{path.name}\'') from e
     
     if prefix != 'fold':
         raise ValueError(f'Primary directory name prefix \'{prefix}\' is not \'fold\'')
@@ -94,12 +95,16 @@ def generate_fold_directory(p: PathLike, foldnum: int) -> str:
     p = Path(p)
     try:
         prefix, previous_foldnum = parse_fold_directory(p)
-    except ValueError as e:
+    except ValueError:
         message = (f'Could not parse \'{p}\' as fold-wise experiment directory. Appending '
                    f'fold-wise experiment directory!')
-        warnings.warn(message, category=UserWarning)
+        logger.warning(message)
         dirpath = p / f'fold-{foldnum}'
     else:
+        if foldnum != (previous_foldnum + 1):
+            message = (f'indicated fold number {foldnum} is non-consecutive to '
+                       f'previous: {previous_foldnum}')
+            logger.warning()
         dirpath = p.parent / f'{prefix}-{foldnum}'
     return str(dirpath)
 
