@@ -10,8 +10,11 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from ruamel.yaml import CommentedMap
 
+from woodnet.configtools import load_yaml, write_yaml
 from woodnet.configtools.validation import TrainingConfiguration
+from woodnet.cvsplits import strategy_to_generator, CVStrategy
 from woodnet.custom.types import PathLike
+
 
 
 ConfigurationLike = Mapping | TrainingConfiguration
@@ -126,11 +129,6 @@ def update_fold_directory(configuration: ConfigurationLike, foldnum: int) -> Non
 
     else:
         raise TypeError(f'invalid argument of {type(configuration)}')
-
-
-
-from woodnet.configtools import load_yaml, write_yaml
-from woodnet.cvsplits import strategy_to_generator, CVStrategy
 
 
 
