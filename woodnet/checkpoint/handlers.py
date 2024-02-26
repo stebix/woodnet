@@ -76,7 +76,7 @@ class RWDHandler:
             raise FileExistsError(f'attempting to overwrite preexisting file at '
                                   f'\'{savepath.resolve()}\' with model file')
         torch.save(model, f=savepath, **kwargs)
-        logger.info(f'succesfully saved checkpoint file to location \'{savepath}\'')
+        logger.info(f'successfully saved checkpoint file to location \'{savepath}\'')
         return savepath
 
 

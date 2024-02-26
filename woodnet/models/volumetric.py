@@ -30,7 +30,7 @@ class ResNet3D(torch.torch.nn.Module):
                  in_channels: int,
                  block: Type[ResNetBlock] = ResNetBlock,
                  final_nonlinearity: str = 'sigmoid',
-                 final_nonlinearty_kwargs: dict | None = None,
+                 final_nonlinearity_kwargs: dict | None = None,
                  testing: bool = False) -> None:
 
         super(ResNet3D, self).__init__()
@@ -61,7 +61,7 @@ class ResNet3D(torch.torch.nn.Module):
         self.avgpool = torch.nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = torch.nn.Linear(512*self.expansion, self.num_classes)
 
-        kwargs = final_nonlinearty_kwargs or {}
+        kwargs = final_nonlinearity_kwargs or {}
         self.final_nonlinearity = create_activation(final_nonlinearity, **kwargs)
 
 
