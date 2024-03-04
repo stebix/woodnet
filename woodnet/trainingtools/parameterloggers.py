@@ -24,7 +24,7 @@ class StrReprMixin:
 
 class AbstractWeightLogger(abc.ABC, StrReprMixin):
     """
-    Report model weights.
+    Report model weights to tensorboard.
     """
     def __init__(self, writer: SummaryWriter) -> None:
         super().__init__()
@@ -36,6 +36,9 @@ class AbstractWeightLogger(abc.ABC, StrReprMixin):
 
 
 class AbstractGradientLogger(abc.ABC, StrReprMixin):
+    """
+    Report model weight gradients to tensorboard.
+    """
     def __init__(self, writer: SummaryWriter) -> None:
         super().__init__()
         self.writer = writer
@@ -93,9 +96,10 @@ class BasicModelParameterLogger(AbstractModelParameterLogger):
     This basic implementation separates the parameters layer-wise (basic ResNet schema)
     and leaves accumulation of values entirely to tensorboard (i.e. via histogram computation).
     """
-    
     def log_weights(self, model: Module, iteration: int) -> None:
+        logger.debug(f'logging model weights at iteration {iteration}')
         pass
 
     def log_gradients(self, model: Module, iteration: int) -> None:
+        logger.debug(f'logging model gradients at iteration {iteration}')
         pass
