@@ -10,10 +10,10 @@ from woodnet.checkpoint.registry import Registry, ScorePreference
 
 
 def is_posinf(value):
-    return math.isinf() and value > 0
+    return math.isinf(value) and value > 0
 
 def is_neginf(value):
-    return math.isinf() and value < 0
+    return math.isinf(value) and value < 0
 
 
 def init(module, value):
@@ -29,7 +29,7 @@ def model():
         torch.nn.Linear(25, 25),
         torch.nn.Linear(25, 2)
     )
-    # intialize with magic value
+    # initialize with magic value
     magic = 1701.0
     _init = partial(init, value=magic)
     with torch.no_grad():
