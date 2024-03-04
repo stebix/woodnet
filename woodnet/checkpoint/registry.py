@@ -78,14 +78,16 @@ class Registry:
     def current_optimal_score(self) -> Number:
         """Return the current optimal score of all registry elements."""
         if self.population == 0:
-            return self.inital_score
+            return self.initial_score
         return self.score_optimality_function(self.scores)
 
+    @property
     def current_max_score(self) -> Number:
         if self.population == 0:
             return self.initial_score
         return max(self.scores)
 
+    @property
     def current_min_score(self) -> Number:
         if self.population == 0:
             return self.initial_score
@@ -142,18 +144,18 @@ class Registry:
 
         if self._score_preference is ScorePreference.HIGHER_IS_BETTER:
 
-            if score > self.current_max_score():
+            if score > self.current_max_score:
                 return ScoreRank.OPTIMAL
-            elif score > self.current_min_score():
+            elif score > self.current_min_score:
                 return ScoreRank.FEASIBLE
             else:
                 return ScoreRank.FUTILE
 
         elif self._score_preference is ScorePreference.LOWER_IS_BETTER:
 
-            if score < self.current_min_score():
+            if score < self.current_min_score:
                 return ScoreRank.OPTIMAL
-            elif score < self.current_max_score():
+            elif score < self.current_max_score:
                 return ScoreRank.FEASIBLE
             else:
                 return ScoreRank.FUTILE
