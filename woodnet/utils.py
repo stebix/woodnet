@@ -10,7 +10,7 @@ from woodnet.directoryhandlers import ExperimentDirectoryHandler
 DEFAULT_TIMESTAMP_FORMAT: str = '%Y-%m-%d_%H-%M-%S'
 
 def create_timestamp(fmt: str | None = None) -> str:
-    """Curent timestamp with second-wise accuracy."""
+    """Current timestamp with second-wise accuracy."""
     fmt = fmt or DEFAULT_TIMESTAMP_FORMAT
     return datetime.datetime.now().strftime(fmt)
 
@@ -33,6 +33,6 @@ def backup_file(source: PathLike,
         target = target.logdir
 
     if target.is_file() and not force_write:
-        raise FileExistsError(f'Cannot backup file to \'{target}\ - already existing.')
+        raise FileExistsError(f'Cannot backup file to \'{target}\' - already existing.')
     
     return shutil.copy(source, target)
