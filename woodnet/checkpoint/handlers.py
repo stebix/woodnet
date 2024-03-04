@@ -137,7 +137,7 @@ class RWDHandler:
         self.check_working_directory(filepath)
         softcheck_filename(filepath, action_verb='reading')
         model = torch.load(f=filepath, **kwargs)
-        logger.info(f'succesfully loaded checkpoint file from location \'{filepath}\'')
+        logger.info(f'successfully loaded checkpoint file from location \'{filepath}\'')
         return model
 
 
