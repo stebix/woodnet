@@ -19,6 +19,7 @@ from woodnet.hooks import install_loginterceptor_excepthook
 from woodnet.logtools import (create_logging_infrastructure, finalize_logging_infrastructure,
                               create_logfile_name)
 from woodnet.extent import compute_training_extent
+from woodnet.checkpoint.registry import Registry
 
 DataLoader = torch.utils.data.DataLoader
 
@@ -152,7 +153,6 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
         loaders[phase] = loader
 
     return loaders
-    
 
 
 def create_trainer(configuration: dict,

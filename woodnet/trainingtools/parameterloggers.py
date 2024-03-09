@@ -9,6 +9,8 @@ from torch.nn.modules import Module
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
+from woodnet.trainingtools.parameterextraction import extract_simple_resnet_parameters, convert_to_flat
+
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __file__))
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
@@ -98,8 +100,12 @@ class BasicModelParameterLogger(AbstractModelParameterLogger):
     """
     def log_weights(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model weights at iteration {iteration}')
-        pass
+        nested_name_weights_mapping, _ = extract_simple_resnet_parameters(model)
+        weights = convert_to_flat(nested_name_weights_mapping)
+        for name, weightarray in weights.items():
+            self.weightlogger.writer.add_histogram(tag=name, values=weightarray,
+                                                   global_step=iteration)
 
     def log_gradients(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model gradients at iteration {iteration}')
-        pass
+        logger.warning('currently dummy method')

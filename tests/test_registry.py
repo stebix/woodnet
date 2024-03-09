@@ -6,7 +6,7 @@ import math
 from functools import partial
 
 from woodnet.checkpoint.handlers import RWDHandler
-from woodnet.checkpoint.registry import Registry, ScorePreference
+from woodnet.checkpoint.registry import *
 
 
 def is_posinf(value):
@@ -147,5 +147,12 @@ def test_emit_scoresheet(tmp_path, model):
     )
     expected_scores = tuple(sorted(preset_scores))[1:]
     assert scores == expected_scores
+
+
+def test_get_registry_class():
+    classname = 'Registry'
+    expected_class = Registry
+    class_ = get_registry_class(classname=classname)    
+    assert class_ == expected_class
 
 

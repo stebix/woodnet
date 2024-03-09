@@ -1,11 +1,13 @@
 # save top k instances of the model 
 import logging
 import torch
+import importlib
 
 from enum import Enum
 from functools import cached_property
 from numbers import Number
 from datetime import datetime
+from pathlib import Path
 
 from woodnet.checkpoint import ScoredCheckpoint
 from woodnet.checkpoint.handlers import RWDHandler
@@ -185,4 +187,59 @@ class Registry:
             }
         }
         return data
-        
+
+
+def create_default_checkpoint_directory(basedir: str | Path) -> Path:
+    checkpoint_dir = Path(basedir) / 'checkpoints'
+    if checkpoint_dir.exists():
+        if checkpoint_dir.is_dir():
+            logger.info(f'Registry uses preexisting checkpoint directory: \'{checkpoint_dir}\'')
+        else:
+            raise FileExistsError(f'Registry initialization failed with pre-existing '
+                                  f'file or object at desired checkpoint directory: \'{checkpoint_dir}\'')
+    else:
+        logger.info(f'Registry uses tentative checkpoint directory with path: \'{checkpoint_dir}\'')
+    return checkpoint_dir
+
+
+
+def get_registry_class(classname: str) -> type[Registry]:
+    """
+    Programmatically retrieve the registry classes by a string name.
+    """
+    module_name = 'woodnet.checkpoint.registry'
+    module = importlib.import_module(name=module_name)
+    try:
+        class_ = getattr(module, classname)
+    except KeyError:
+        raise ValueError(
+            f'Could not retrieve class \'{classname}\' from module \'{module}\''
+        )
+    return class_
+
+
+
+def create_score_registry(configuration: dict,
+                          checkpoint_directory: str | Path | None) -> Registry:
+    """
+    Create the score registry from the top-level configuration dictionary.
+    """
+    registry_config = configuration['trainer']['score_registry']
+    capacity = registry_config.get('capacity', default=1)
+    preference = registry_config['score_preference']
+    preference = ScorePreference(preference)
+
+    if not checkpoint_directory:
+        logger.info('Initializing registry initialization with top-level configuration '
+                    'deduced checkpoint directory.')
+        checkpoint_directory = create_default_checkpoint_directory(
+            configuration['experiment_directory']
+        )
+
+
+
+
+
+
+
+
