@@ -34,7 +34,7 @@ INITIAL_SCORES: dict[ScorePreference, float] = {
 }
 
 
-"""List based WIP version of the score registry"""
+
 class Registry:
     """
     This fixed-size registry keeps track of model instances and their corresponding
@@ -59,6 +59,11 @@ class Registry:
     def capacity(self) -> int:
         """Maximum number of registry entries."""
         return self._capacity
+    
+    @property
+    def score_preference(self) -> ScorePreference:
+        """Score preference."""
+        return self._score_preference
     
     @cached_property
     def score_optimality_function(self) -> callable:
@@ -193,7 +198,7 @@ def create_default_checkpoint_directory(basedir: str | Path) -> Path:
     checkpoint_dir = Path(basedir) / 'checkpoints'
     if checkpoint_dir.exists():
         if checkpoint_dir.is_dir():
-            logger.info(f'Registry uses preexisting checkpoint directory: \'{checkpoint_dir}\'')
+            logger.info(f'Registry using preexisting checkpoint directory: \'{checkpoint_dir}\'')
         else:
             raise FileExistsError(f'Registry initialization failed with pre-existing '
                                   f'file or object at desired checkpoint directory: \'{checkpoint_dir}\'')
@@ -225,16 +230,23 @@ def create_score_registry(configuration: dict,
     Create the score registry from the top-level configuration dictionary.
     """
     registry_config = configuration['trainer']['score_registry']
-    capacity = registry_config.get('capacity', default=1)
-    preference = registry_config['score_preference']
-    preference = ScorePreference(preference)
+    capacity = registry_config.get('capacity', 1)
+    preference = ScorePreference(registry_config['score_preference'])
+    registry_class = get_registry_class(registry_config['name'])
 
     if not checkpoint_directory:
-        logger.info('Initializing registry initialization with top-level configuration '
-                    'deduced checkpoint directory.')
+        logger.info('Initializing registry checkpoint directory via deduction '
+                    'from top-level configuration.')
         checkpoint_directory = create_default_checkpoint_directory(
             configuration['experiment_directory']
         )
+    else:
+        checkpoint_directory = Path(checkpoint_directory)
+    
+    handler = RWDHandler(directory=checkpoint_directory)
+    registry = registry_class(capacity=capacity, score_preference=preference,
+                              rwd_handler=handler)
+    return registry
 
 
 

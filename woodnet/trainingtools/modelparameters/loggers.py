@@ -2,110 +2,68 @@
 Implement objects to programmatically log model parameters (i.e. weights and corresponding gradients)
 to a tensorboard `SummaryWriter` backend 
 """
-import abc
+import sys
 import logging
-import torch
 from torch.nn.modules import Module
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from woodnet.trainingtools.parameterextraction import extract_simple_resnet_parameters, convert_to_flat
+from woodnet.trainingtools.modelparameters.extraction import extract_simple_resnet_parameters, convert_to_flat
+
 
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __file__))
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
 
-class StrReprMixin:
-    """Provide str and repr dunder methods based on the `writer` attribute."""
-    def __str__(self) -> str:
-        return self.__repr__()
-    
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(writer_log_dir=\'{self.writer.log_dir}\')'
-
-
-class AbstractWeightLogger(abc.ABC, StrReprMixin):
+class VoidLogger:
     """
-    Report model weights to tensorboard.
+    Void logger that does not perform actual parameter extraction and reporting. 
     """
-    def __init__(self, writer: SummaryWriter) -> None:
-        super().__init__()
-        self.writer = writer
-
-    @abc.abstractmethod
-    def log_weights(self, model: torch.nn.Module, iteration: int) -> None:
+    def __init__(self) -> None:
         pass
 
-
-class AbstractGradientLogger(abc.ABC, StrReprMixin):
-    """
-    Report model weight gradients to tensorboard.
-    """
-    def __init__(self, writer: SummaryWriter) -> None:
-        super().__init__()
-        self.writer = writer
-
-    @abc.abstractmethod
-    def log_gradients(self, model: torch.nn.Module, iteration: int) -> None:
+    def log_weights(self, *args, **kwargs) -> None:
         pass
 
+    def log_gradients(self, *args, **kwargs) -> None:
+        pass
 
-class AbstractModelParameterLogger(abc.ABC):
-    """
-    Provides abstract architecture.
-    """
-    def __init__(self, weightlogger: AbstractWeightLogger, gradientlogger: AbstractGradientLogger) -> None:
-        super().__init__()
-        self.gradientlogger = gradientlogger
-        self.weightlogger = weightlogger
-        self._check_sublogger_directories()
-
-
-    def _check_sublogger_directories(self) -> None:
-        weightlogger_dir = self.weightlogger.writer.log_dir
-        gradlogger_dir = self.gradientlogger.writer.log_dir
-
-        if not weightlogger_dir == gradlogger_dir:
-            logger.warning(
-                f'weight parameter sublogger (\'{weightlogger_dir}\') and gradient '
-                f'parameter sublogger (\'{gradlogger_dir}\') log directories do not match'
-            )
-
-
-    @abc.abstractmethod
-    def log_weights(self, model: torch.nn.Module, iteration: int) -> None:
-        """Log the weights of the model to the `SummaryWriter`.
-        """
-        self.weightlogger.log_weights(model, iteration)
-
-
-    @abc.abstractmethod
-    def log_gradients(self, model: torch.nn.Module, iteration: int) -> None:
-        """Log the gradients of the model to the `SummaryWriter`
-        """
-        self.gradientlogger.log_gradients(model, iteration)
-    
     def __str__(self) -> str:
-        return self.__repr__()
-    
+        return repr(self)
+        
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(writer_log_dir=\'{self.writer.log_dir}\')'
-    
+        return ''.join((self.__class__.__name__, '()'))
 
-class BasicModelParameterLogger(AbstractModelParameterLogger):
-    """Log model parameters (wights and gradients) to the tensorboard `SummaryWriter`.
 
-    This basic implementation separates the parameters layer-wise (basic ResNet schema)
-    and leaves accumulation of values entirely to tensorboard (i.e. via histogram computation).
-    """
+class HistogramLogger:
+
+    def __init__(self, writer: SummaryWriter) -> None:
+        self.writer = writer
+
     def log_weights(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model weights at iteration {iteration}')
         nested_name_weights_mapping, _ = extract_simple_resnet_parameters(model)
         weights = convert_to_flat(nested_name_weights_mapping)
         for name, weightarray in weights.items():
-            self.weightlogger.writer.add_histogram(tag=name, values=weightarray,
-                                                   global_step=iteration)
+            self.writer.add_histogram(tag=name, values=weightarray,
+                                      global_step=iteration)
 
     def log_gradients(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model gradients at iteration {iteration}')
         logger.warning('currently dummy method')
+        pass
+
+    def __str__(self) -> str:
+        return self.__repr__()
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(writer_log_dir=\'{self.writer.log_dir}\')'
+
+
+def get_parameter_logger_class(name: str) -> type:
+    """Retrieve parameter logger class by name."""
+    modules = [sys.modules[__name__]]
+    for module in modules:
+        return getattr(module, name)
+    raise AttributeError(f'could not retrieve parameter logger with name \'{name}\'')
+

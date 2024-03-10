@@ -42,7 +42,6 @@ class AbstractBaseTrainer(abc.ABC):
 
 class Trainer:
 
-    writer_class: Type[SummaryWriter] = SummaryWriter
     dtype: torch.dtype = torch.float32
     leave_total_progress: bool = True
 
@@ -298,7 +297,7 @@ class Trainer:
 
 
 def retrieve_trainer_class(name: str) -> Type[AbstractBaseTrainer]:
-    """Retreive any trainer class by its string name."""
+    """Retrieve any trainer class by its string name."""
     # TODO: change this if factored out of this specific module
     import sys
     modules = [sys.modules[__name__]]
@@ -312,8 +311,21 @@ def retrieve_trainer_class(name: str) -> Type[AbstractBaseTrainer]:
 
 
 
-from woodnet.trainingtools.parameterloggers import AbstractModelParameterLogger, BasicModelParameterLogger
 from woodnet.checkpoint.registry import Registry
+
+from typing import Protocol
+
+
+class ParameterLogger(Protocol):
+
+    def log_weights(self, model: torch.nn.Module, iteration: int) -> None:
+        pass
+
+    def log_gradients(self, model: torch.nn.Module, iteration: int) -> None:
+        pass
+
+
+from woodnet.trainingtools.modelparameters.loggers import VoidLogger
 
 class Trainer2:
 
@@ -335,11 +347,11 @@ class Trainer2:
                  max_num_iters: int,
                  log_after_iters: int,
                  validate_after_iters: int,
-                 parameter_logger: AbstractModelParameterLogger,
                  use_amp: bool,
                  use_inference_mode: bool,
                  save_model_checkpoint_every_n: int,
-                 writer: SummaryWriter | None
+                 writer: SummaryWriter,
+                 parameter_logger: ParameterLogger | None
                  ) -> None:
 
         self.model = model
@@ -356,9 +368,8 @@ class Trainer2:
 
         self.validation_criterion = validation_criterion
         self.handler = handler
-        # if not supplied, a new writer that receives its log directory destination from
-        # io_handler instance is created and utilized as the tensorboard writer.
-        self.writer = self._init_writer(writer)
+        self.writer = writer
+        self.parameter_logger = parameter_logger or VoidLogger()
 
         self.validation_metric = validation_metric
         self.score_registry = score_registry
@@ -561,14 +572,4 @@ class Trainer2:
             wasteitem.remove()
 
         return None
-
-
-    def _init_writer(self, writer: SummaryWriter | None) -> SummaryWriter:
-        if SummaryWriter is None:
-            self.logger.info(f'Initializing new {self.writer_class} with log '
-                             f'directory: \'{self.handler.logdir}\'')
-            writer = self.writer_class(log_dir=self.handler.logdir)
-        else:
-            self.logger.info(f'Using existing supplied {type(writer)} instance')
-        return writer
 

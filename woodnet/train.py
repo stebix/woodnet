@@ -8,6 +8,7 @@ from copy import deepcopy
 from collections.abc import Callable, Iterable
 from typing import Any, Hashable, Literal
 from pathlib import Path
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from woodnet.models import create_model
 from woodnet.custom.exceptions import ConfigurationError
@@ -77,7 +78,7 @@ def retrieve_logged(d: dict, /, key: Hashable, default: Any, method: Literal['ge
 
     method : Literal
         Choose between value get (non-modifying) and value pop
-        (in-place modfication).
+        (in-place modification).
 
     prefix : str, optional
         Set additional prefix information for the key.
@@ -122,7 +123,7 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     Create training and validation data loader from top-level config.
     """
     if 'loaders' not in configuration:
-        raise ConfigurationError('missing required loaders subcongiguration')
+        raise ConfigurationError('missing required loaders subconfiguration')
 
     dataset_config = deepcopy(configuration['loaders'])
 
@@ -153,6 +154,15 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
         loaders[phase] = loader
 
     return loaders
+
+
+def init_writer(handler: ExperimentDirectoryHandler) -> SummaryWriter:
+    writer_class = SummaryWriter
+    logger.info(f'Initializing new {writer_class} with target log '
+                f'directory: \'{handler.logdir}\'')
+    writer = writer_class(log_dir=handler.logdir)
+    return writer
+
 
 
 def create_trainer(configuration: dict,
@@ -210,7 +220,7 @@ def create_trainer(configuration: dict,
     validation_metric_higher_is_better = pop_logged(trainerconf,
                                                     key='validation_metric_higher_is_better',
                                                     default=True)
-    
+    writer = init_writer(handler=handler)    
     logger.debug(f'Injecting remaining kwargs into trainer constructor: {trainerconf}')
     
     trainer = trainer_class(
