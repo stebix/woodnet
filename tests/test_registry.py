@@ -156,3 +156,32 @@ def test_get_registry_class():
     assert class_ == expected_class
 
 
+def test_create_registry_from_valid_configuration(tmp_path):
+    # basal configuration settings
+    expected_capacity = 3
+    expected_preference_str = 'higher_is_better'
+    expected_preference = ScorePreference(expected_preference_str)
+    
+    checkpoint_directory = tmp_path / 'checkpoints'
+    checkpoint_directory.mkdir()
+
+    config = {
+        'name' : 'Registry',
+        'capacity' : expected_capacity,
+        'score_preference' : expected_preference_str
+    }
+    toplevel_configuration = {
+        'trainer' : {
+            'score_registry' : config
+        }
+    }
+    registry = create_score_registry(toplevel_configuration,
+                                     checkpoint_directory=checkpoint_directory)
+    
+    # test some properties of the registry
+    assert registry.capacity == expected_capacity
+    assert registry.score_preference == expected_preference
+    assert registry.rwd_handler.directory == checkpoint_directory
+
+
+
