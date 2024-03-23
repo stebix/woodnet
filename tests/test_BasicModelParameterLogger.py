@@ -1,7 +1,7 @@
 import numpy as np
 
 from woodnet.models.planar import ResNet18
-from woodnet.trainingtools.modelparameters.loggers import HistogramLogger
+from woodnet.logtools.tensorboard.modelparameters.loggers import HistogramLogger
 
 
 class Mockwriter:

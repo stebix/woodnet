@@ -1,4 +1,4 @@
-from woodnet.logtools import create_instance_logger
+from woodnet.logtools.infrastructure import create_instance_logger
 
 
 class MockObjectForInstanceLogger:

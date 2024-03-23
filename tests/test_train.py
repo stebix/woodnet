@@ -2,8 +2,10 @@ import logging
 
 from ruamel.yaml import YAML
 
+import woodnet.logtools.dict.ops as logged
 from woodnet.models import create_model
-from woodnet.train import create_optimizer, create_loss, create_loaders, run_training_experiment, retrieve_logged
+from woodnet.train import create_optimizer, create_loss, create_loaders, run_training_experiment
+
 
 
 def test_retrieve_logged(caplog):
@@ -12,8 +14,8 @@ def test_retrieve_logged(caplog):
         'setting' : True,
         'parameter' : 'warp 9'
     }
-    value_a = retrieve_logged(data, key='energize', default='do not beam me up', method='get')
-    value_b = retrieve_logged(data, key='parameter', default='warp 1', method='get')
+    value_a = logged.retrieve(data, key='energize', default='do not beam me up', method='get')
+    value_b = logged.retrieve(data, key='parameter', default='warp 1', method='get')
 
     assert value_a == 'do not beam me up'
     assert value_b == 'warp 9'
