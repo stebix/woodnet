@@ -6,21 +6,21 @@ import tqdm.auto as tqdm
 
 from copy import deepcopy
 from collections.abc import Callable, Iterable
-from typing import Any, Hashable, Literal
 from pathlib import Path
-from torch.utils.tensorboard.writer import SummaryWriter
+
+import woodnet.logtools.dict.ops as logged 
 
 from woodnet.models import create_model
 from woodnet.custom.exceptions import ConfigurationError
 from woodnet.datasets.volumetric import TileDatasetBuilder
-from woodnet.training import AbstractBaseTrainer, retrieve_trainer_class
+from woodnet.trainer import retrieve_trainer_class
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
 from woodnet.configtools import load_yaml, backup_configuration
 from woodnet.hooks import install_loginterceptor_excepthook
-from woodnet.logtools import (create_logging_infrastructure, finalize_logging_infrastructure,
-                              create_logfile_name)
+from woodnet.logtools.infrastructure import (create_logging_infrastructure,
+                                             finalize_logging_infrastructure,
+                                             create_logfile_name)
 from woodnet.extent import compute_training_extent
-from woodnet.checkpoint.registry import Registry
 
 DataLoader = torch.utils.data.DataLoader
 
@@ -29,14 +29,15 @@ logger = logging.getLogger(LOGGER_NAME)
 
 BACKUP_CONFIGURATION_FILE: bool = bool(os.environ.get('BACKUP_CONFIGURATION_FILE', default=1))
 
+
 def create_optimizer(model: Callable | torch.nn.Module,
                      configuration: dict) -> torch.optim.Optimizer:
     """
-    Instantiate the optimimzer from the top-level configuration using
+    Instantiate the optimizer from the top-level configuration using
     the model parameters.
     """
     if 'optimizer' not in configuration:
-        raise ConfigurationError('missing required optimimzer subconfiguration')
+        raise ConfigurationError('missing required optimizer subconfiguration')
 
     optconf = deepcopy(configuration['optimizer'])
     name = optconf.pop('name')
@@ -47,75 +48,14 @@ def create_optimizer(model: Callable | torch.nn.Module,
     return optimizer
 
 
-
 def create_loss(configuration: dict) -> torch.nn.Module:
-    """Cereate the loss criterion from the top-level configuration."""
+    """Create the loss criterion from the top-level configuration."""
     if 'loss' not in configuration:
         raise ConfigurationError('missing required loss subconfiguration')
     lossconf = deepcopy(configuration['loss'])
     name = lossconf.pop('name')
     loss_class = getattr(torch.nn, name)
     return loss_class(**lossconf)
-
-
-
-def retrieve_logged(d: dict, /, key: Hashable, default: Any, method: Literal['get', 'pop'],
-                    prefix: str = '', suffix: str = '') -> Any:
-    """
-    Retrieve a value of dictionary and log whether actual or default value was retrieved.
-
-    Parameters
-    ----------
-
-    d : dictionary
-        Base container.
-
-    key : Hashable
-        Key for the desired value.
-
-    default : Any
-        Default value returned if key - value pair is not present.
-
-    method : Literal
-        Choose between value get (non-modifying) and value pop
-        (in-place modification).
-
-    prefix : str, optional
-        Set additional prefix information for the key.
-        Defaults to empty string. 
-
-    suffix : str, optional
-        Set additional suffix information for the key.
-        Defaults to empty string. 
-
-    Returns
-    -------
-
-    value : Any
-        Either the value defined by the dictionary or the default value.
-    """
-    sentinel = object()
-    retrieve = d.get if method == 'get' else d.pop
-    value = retrieve(key, sentinel)
-    expanded_key = ''.join((prefix, key, suffix))
-    if value is sentinel:
-        value = default
-        logger.info(f'Using \'{expanded_key}\' with internal default value < {value} >')
-    else:
-        logger.info(f'Using \'{expanded_key}\' with configuration value < {value} >')
-    return value
-
-
-def get_logged(d: dict, /, key: Hashable, default: Any,
-               prefix: str = '', suffix: str = '') -> Any:
-    return retrieve_logged(d, key=key, default=default, method='get',
-                           prefix=prefix, suffix=suffix)
-
-def pop_logged(d: dict, /, key: Hashable, default: Any,
-               prefix: str = '', suffix: str = '') -> Any:
-    return retrieve_logged(d, key=key, default=default, method='pop',
-                           prefix=prefix, suffix=suffix)
-
 
 
 def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader]:
@@ -128,10 +68,10 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     dataset_config = deepcopy(configuration['loaders'])
 
     name = dataset_config.get('dataset')
-    num_workers = pop_logged(dataset_config, key='num_workers', default=1)
-    pin_memory = pop_logged(dataset_config, key='pin_memory', default=False)
-    batchsize = pop_logged(dataset_config, key='batchsize', default=1)
-    tileshape = get_logged(dataset_config, key='tileshape', default=(128, 128, 128))
+    num_workers = logged.pop(dataset_config, key='num_workers', default=1)
+    pin_memory = logged.pop(dataset_config, key='pin_memory', default=False)
+    batchsize = logged.pop(dataset_config, key='batchsize', default=1)
+    tileshape = logged.get(dataset_config, key='tileshape', default=(128, 128, 128))
 
     # TODO: change this to clear interface for all dataset types
     assert name == 'TileDataset'
@@ -156,15 +96,6 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     return loaders
 
 
-def init_writer(handler: ExperimentDirectoryHandler) -> SummaryWriter:
-    writer_class = SummaryWriter
-    logger.info(f'Initializing new {writer_class} with target log '
-                f'directory: \'{handler.logdir}\'')
-    writer = writer_class(log_dir=handler.logdir)
-    return writer
-
-
-
 def create_trainer(configuration: dict,
                    model: torch.nn.Module | Callable,
                    handler: ExperimentDirectoryHandler,
@@ -173,20 +104,20 @@ def create_trainer(configuration: dict,
                    loaders: dict[str, DataLoader],
                    validation_criterion: Callable | None = None,
                    leave_total_progress: bool = True
-                   ) -> AbstractBaseTrainer:
+                   ):
     
     if 'trainer' not in configuration:
         raise ConfigurationError('missing required trainer subconfiguration')
 
     trainerconf = deepcopy(configuration['trainer'])
-    device = get_logged(configuration, key='device', default='cpu')
+    device = logged.get(configuration, key='device', default='cpu')
     if device == 'cpu':
         logger.warning('Selected device \'cpu\' may not provided adequate runtime performance')
     
     logger.info(f'Using training device: \'{device}\'')
     
     # TODO: implement systematic retrieval for multiple trainer classes
-    trainer_class_name = pop_logged(trainerconf, key='name', default='Trainer', prefix='trainer_class')
+    trainer_class_name = logged.pop(trainerconf, key='name', default='Trainer', prefix='trainer_class')
     trainer_class = retrieve_trainer_class(trainer_class_name)
     logger.info(f'Using trainer class: {trainer_class}')
     trainer_class.leave_total_progress = leave_total_progress
@@ -195,19 +126,19 @@ def create_trainer(configuration: dict,
     trainloader = loaders.get('train')
     batchsize = trainloader.batch_size
     # extract configuration values for extent specification
-    conf_max_num_epochs = pop_logged(trainerconf, key='max_num_epochs', default=None)
-    conf_max_num_iters = pop_logged(trainerconf, key='max_num_iters', default=None)
-    conf_gradient_budget = pop_logged(trainerconf, key='gradient_budget', default=None)
+    conf_max_num_epochs = logged.pop(trainerconf, key='max_num_epochs', default=None)
+    conf_max_num_iters = logged.pop(trainerconf, key='max_num_iters', default=None)
+    conf_gradient_budget = logged.pop(trainerconf, key='gradient_budget', default=None)
     extent = compute_training_extent(loader_length=len(trainloader), max_num_epochs=conf_max_num_epochs,
                                      max_num_iters=conf_max_num_iters, gradient_budget=conf_gradient_budget,
                                      batchsize=batchsize)
     logger.info(extent)
 
-    log_after_iters = pop_logged(trainerconf, 'log_after_iters', default=250)
-    validate_after_iters = pop_logged(trainerconf, 'validate_after_iters', default=1000)
-    use_amp = pop_logged(trainerconf, 'use_amp', default=True)
-    use_inference_mode = pop_logged(trainerconf, 'use_inference_mode', default=True)
-    save_model_checkpoint_every_n = pop_logged(trainerconf, 'save_model_checkpoint_every_n', default=5)
+    log_after_iters = logged.pop(trainerconf, 'log_after_iters', default=250)
+    validate_after_iters = logged.pop(trainerconf, 'validate_after_iters', default=1000)
+    use_amp = logged.pop(trainerconf, 'use_amp', default=True)
+    use_inference_mode = logged.pop(trainerconf, 'use_inference_mode', default=True)
+    save_model_checkpoint_every_n = logged.pop(trainerconf, 'save_model_checkpoint_every_n', default=5)
 
 
     if validation_criterion is None:
@@ -216,8 +147,8 @@ def create_trainer(configuration: dict,
     else:
         logger.info(f'Explicit validation criterion {validation_criterion} provided')
     
-    validation_metric = pop_logged(trainerconf, key='validation_metric', default='ACC')
-    validation_metric_higher_is_better = pop_logged(trainerconf,
+    validation_metric = logged.pop(trainerconf, key='validation_metric', default='ACC')
+    validation_metric_higher_is_better = logged.pop(trainerconf,
                                                     key='validation_metric_higher_is_better',
                                                     default=True)
     writer = init_writer(handler=handler)    

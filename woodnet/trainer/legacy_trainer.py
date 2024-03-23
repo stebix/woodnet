@@ -2,15 +2,21 @@ import logging
 import torch
 import tqdm.auto as tqdm
 
-from torch.utils.tensorboard import SummaryWriter
+from typing import Literal, TypeAlias
 from torch.utils.data.dataloader import DataLoader
-from typing import Literal
+from torch.utils.tensorboard import SummaryWriter
 
 
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
 from woodnet.evaluation.metrics import compute_cardinalities
 from woodnet.trackers import TrackedCardinalities, TrackedScalar
-from woodnet.training import LOGGER_NAME, Tensor, TerminationReason, get_batchsize
+from woodnet.trainer.utils import TerminationReason, get_batchsize
+
+LOGGER_NAME: str = '.'.join(('main', __name__))
+logger = logging.getLogger(LOGGER_NAME)
+
+Tensor: TypeAlias = torch.Tensor
+DataLoader: TypeAlias = torch.utils.data.DataLoader
 
 class LegacyTrainer:
     """
@@ -269,3 +275,8 @@ class LegacyTrainer:
         if self.validation_metric_higher_is_better:
             return float('-inf')
         return float('+inf')
+    
+
+    @classmethod
+    def create(cls, *args, **kwargs) -> 'LegacyTrainer':
+        raise NotImplementedError()

@@ -1,67 +1,31 @@
-import abc
 import torch
 import logging
-import enum
-
 import tqdm.auto as tqdm
 
-from typing import Literal, Protocol, Type
+from collections.abc import MutableMapping, Callable
+from copy import deepcopy
+from typing import Literal, Protocol, TypeAlias
 from torch.utils.tensorboard import SummaryWriter
 
-from woodnet.evaluation.metrics import compute_cardinalities
-from woodnet.extent import compute_training_extent
-from woodnet.trackers import TrackedScalar, TrackedCardinalities
+from woodnet.checkpoint.registry import Registry
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
+from woodnet.evaluation.metrics import compute_cardinalities
+from woodnet.trackers import TrackedScalar, TrackedCardinalities
+from woodnet.logtools.tensorboard.modelparameters.loggers import VoidLogger
+from woodnet.trainer.utils import TerminationReason, get_batchsize
+from woodnet.logtools.dict import LoggedDict
+from woodnet.custom.exceptions import ConfigurationError
+from woodnet.extent import compute_training_extent
+from woodnet.logtools.tensorboard import init_writer
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
-Tensor = torch.Tensor
-DataLoader = torch.utils.data.DataLoader
-
-
-class TerminationReason(enum.Enum):
-    MAX_ITERATIONS_REACHED = 'max_iterations_reached'
-    MAX_EPOCHS_REACHED = 'max_epochs_reached'
-    MIN_LEARNING_RATE_REACHED = 'min_learning_rate_reached'
-
-
-def get_batchsize(tensor: Tensor) -> int:
-    return tensor.shape[1]
-
-
-
-
-
-class AbstractBaseTrainer(abc.ABC):
-
-    @abc.abstractmethod
-    def train(self, *args, **kwargs):
-        pass
-
-
-def retrieve_trainer_class(name: str) -> Type[AbstractBaseTrainer]:
-    """Retrieve any trainer class by its string name."""
-    # TODO: change this if factored out of this specific module
-    import sys
-    modules = [sys.modules[__name__]]
-    for module in modules:
-        try:
-            return getattr(module, name)
-        except AttributeError:
-            pass
-    
-    raise ValueError(f'unrecognized trainer class name \'{name}\'')
-
-
-
-from woodnet.checkpoint.registry import Registry
-
-from typing import Protocol
+Tensor: TypeAlias = torch.Tensor
+DataLoader: TypeAlias = torch.utils.data.DataLoader
 
 
 class ParameterLogger(Protocol):
-
     def log_weights(self, model: torch.nn.Module, iteration: int) -> None:
         pass
 
@@ -69,11 +33,14 @@ class ParameterLogger(Protocol):
         pass
 
 
-from woodnet.trainingtools.modelparameters.loggers import VoidLogger
+class Trainer:
+    """
+    New modern and shiny trainer.
 
-class Trainer2:
-
-    writer_class: Type[SummaryWriter] = SummaryWriter
+    TODO: Currently saving model checkpoints is performed by both
+    the `ExperimentDirectoryHandler` instance and the `Registry`
+    instance.
+    """
     dtype: torch.dtype = torch.float32
     leave_total_progress: bool = True
 
@@ -316,4 +283,74 @@ class Trainer2:
             wasteitem.remove()
 
         return None
+    
 
+    @classmethod
+    def create(cls,
+               configuration: MutableMapping,
+               model: torch.nn.Module | Callable,
+               handler: ExperimentDirectoryHandler,
+               device: torch.device,
+               optimizer: torch.optim.Optimizer,
+               criterion: torch.nn.Module | Callable,
+               loaders: MutableMapping[str, DataLoader],
+               validation_criterion: Callable | None = None,
+               leave_total_progress: bool = True
+               ) -> 'Trainer':
+        
+        # todo maybe extricate the trainer configuration        
+        if 'trainer' not in configuration:
+            raise ConfigurationError('missing required trainer subconfiguration')
+
+        trainerconf = LoggedDict(deepcopy(configuration['trainer']), logger=logger)
+        
+        logger.info(f'Using training device: \'{device}\'')
+        
+        # TODO: implement systematic retrieval for multiple trainer classes
+        logger.info(f'Using setting leave_total_progress: {leave_total_progress}')
+
+        trainloader = loaders.get('train')
+        batchsize = trainloader.batch_size
+        # extract configuration values for extent specification
+        conf_max_num_epochs = trainerconf.pop(key='max_num_epochs', default=None)
+        conf_max_num_iters = trainerconf.pop(key='max_num_iters', default=None)
+        conf_gradient_budget = trainerconf.pop(key='gradient_budget', default=None)
+
+        extent = compute_training_extent(loader_length=len(trainloader), max_num_epochs=conf_max_num_epochs,
+                                         max_num_iters=conf_max_num_iters, gradient_budget=conf_gradient_budget,
+                                         batchsize=batchsize)
+        logger.info(extent)
+
+        log_after_iters = trainerconf.pop('log_after_iters', default=250)
+        validate_after_iters = trainerconf.pop('validate_after_iters', default=1000)
+        use_amp = trainerconf.pop('use_amp', default=True)
+        use_inference_mode = trainerconf.pop('use_inference_mode', default=True)
+        save_model_checkpoint_every_n = trainerconf.pop('save_model_checkpoint_every_n', default=5)
+
+        if validation_criterion is None:
+            validation_criterion = criterion
+            logger.info(f'No validation criterion set, using deduced criterion {validation_criterion}')
+        else:
+            logger.info(f'Using explicitly provided validation criterion \'{validation_criterion}\'')
+        
+        validation_metric = trainerconf.pop(key='validation_metric', default='ACC')
+
+        # construct the score registry
+        registry_conf = trainerconf.pop('score_registry', default=None)
+        
+        writer = init_writer(handler=handler)    
+        logger.debug(f'Injecting remaining kwargs into trainer constructor: {trainerconf}')
+        
+        trainer = cls(
+            model=model, optimizer=optimizer, criterion=criterion,
+            loaders=loaders, handler=handler, validation_criterion=validation_criterion,
+            device=device, max_num_epochs=extent.max_num_epochs, max_num_iters=extent.max_num_iters,
+            log_after_iters=log_after_iters, validate_after_iters=validate_after_iters,
+            use_amp=use_amp, use_inference_mode=use_inference_mode,
+            save_model_checkpoint_every_n=save_model_checkpoint_every_n,
+            validation_metric=validation_metric,
+            leave_total_progress=leave_total_progress,
+            **trainerconf
+        )
+
+        return trainer
