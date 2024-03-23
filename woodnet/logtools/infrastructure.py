@@ -1,4 +1,8 @@
-import datetime
+"""
+General logging infrastructure.
+
+@jsteb 2024
+"""
 import pathlib
 import logging
 import logging.handlers

@@ -8,7 +8,7 @@ from torch.nn.modules import Module
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from woodnet.trainingtools.modelparameters.extraction import extract_simple_resnet_parameters, convert_to_flat
+from woodnet.logtools.tensorboard.modelparameters.extraction import extract_simple_resnet_parameters, convert_to_flat
 
 
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __file__))
