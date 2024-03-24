@@ -85,9 +85,9 @@ class ExperimentDirectoryHandler:
                  directory: PathLike) -> None:
         
         dirs = self.initialize_directories(directory)
-        self.base = dirs.base
-        self.logdir = dirs.log
-        self.checkpoints_dir = dirs.checkpoints
+        self.base: Path = dirs.base
+        self.logdir: Path = dirs.log
+        self.checkpoints_dir: Path = dirs.checkpoints
 
 
     def initialize_directories(self, base) -> None:
