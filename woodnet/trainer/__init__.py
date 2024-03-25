@@ -1,3 +1,4 @@
+import importlib
 from typing import Type, Union
 
 from woodnet.trainer.base_trainer import Trainer
@@ -9,11 +10,12 @@ TrainerClass = Union[Type[Trainer], Type[LegacyTrainer]]
 
 def retrieve_trainer_class(name: str) -> TrainerClass:
     """Retrieve any trainer class by its string name."""
-    modules = [
+    module_names = [
         'woodnet.trainer.base_trainer',
         'woodnet.trainer.legacy_trainer'
     ]
-    for module in modules:
+    for module_name in module_names:
+        module = importlib.import_module(module_name)
         try:
             return getattr(module, name)
         except AttributeError:

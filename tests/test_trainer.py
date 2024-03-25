@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
 from woodnet.trainer.base_trainer import Trainer
+from woodnet.trainer import retrieve_trainer_class
 
 # allow user running the test from CLI to set the log level programmatically
 # as an environment variable
@@ -123,6 +124,16 @@ def configuration() -> dict:
         'parameter_logger' : paramlogger_conf
     }
     return {'trainer' : conf}
+
+
+class Test_retrieve_trainer_class:
+
+    def test_with_Trainer(self):
+        name = 'Trainer'
+        expected_class = Trainer
+        class_ = retrieve_trainer_class(name)
+        assert class_ == expected_class
+
 
 
 @pytest.mark.integration
