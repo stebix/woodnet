@@ -3,36 +3,19 @@ import logging
 import torch
 import importlib
 
-from enum import Enum
+from collections.abc import Mapping
 from functools import cached_property
 from numbers import Number
 from datetime import datetime
 from pathlib import Path
 
 from woodnet.checkpoint import ScoredCheckpoint
+from woodnet.checkpoint.scores import ScorePreference, ScoreRank, INITIAL_SCORES
 from woodnet.checkpoint.handlers import RWDHandler
-
+from woodnet.logtools.dict import LoggedDict
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
-
-
-class ScorePreference(Enum):
-    HIGHER_IS_BETTER = 'higher_is_better'
-    LOWER_IS_BETTER = 'lower_is_better'
-
-
-class ScoreRank(Enum):
-    OPTIMAL = 'optimal'
-    FEASIBLE = 'feasible'
-    FUTILE = 'futile'
-
-
-INITIAL_SCORES: dict[ScorePreference, float] = {
-    ScorePreference.HIGHER_IS_BETTER :  float('-inf'),
-    ScorePreference.LOWER_IS_BETTER :  float('+inf'),
-}
-
 
 
 class Registry:
@@ -48,6 +31,10 @@ class Registry:
         self._capacity: int = capacity
         self._score_preference: ScorePreference = score_preference
         self._content: list[ScoredCheckpoint] = []
+        if score_preference is ScorePreference.HIGHER_IS_BETTER:
+            self._reverse: bool = True
+        else:
+            self._reverse: bool = False
         self.rwd_handler: RWDHandler = rwd_handler
             
     @property
@@ -115,30 +102,42 @@ class Registry:
         score, model = item
         rank = self.query_score_rank(score)
 
-        if rank in {ScoreRank.OPTIMAL, ScoreRank.FEASIBLE}:
-            qualifier = 'optimal' if rank is ScoreRank.OPTIMAL else None
-            # TODO: maybe move savepath generation back into CRDHandler definition
-            savepath = self.rwd_handler.write(model=model, qualifier=qualifier)
-            chkpt = ScoredCheckpoint(filepath=savepath, score=score)
+        if rank is ScoreRank.FUTILE:
+            # score is not feasible - we do not need to do anything further
+            logger.info(f'no-op: attempted registration of checkpoint with futile score < {score} >')
+            return None
 
-            self._content.append(chkpt)
-            # always keep registry content sorted best-to-worst score
-            reverse = True if self._score_preference is ScorePreference.HIGHER_IS_BETTER else False
-            self._content = sorted(self._content, key=lambda c: c.score, reverse=reverse)
+        qualifier = 'optimal' if rank is ScoreRank.OPTIMAL else None
+        # TODO: maybe move savepath generation back into CRDHandler definition
+        savepath = self.rwd_handler.write(model=model, qualifier=qualifier)
+        chkpt = ScoredCheckpoint(filepath=savepath, score=score, rank=rank)
 
-            logger.debug(f'registered new {qualifier or "feasible"} registry item <{score}>')
+        # demote the pre-existing optimal ScoredCheckpoint instance 
+        if rank is ScoreRank.OPTIMAL:
+            self.demote_current_optimal()
 
-            if len(self._content) > self.capacity:
-                # pop worst-scoring item from the content list
-                wasteitem = self._content.pop(-1)
-            else:
-                wasteitem = None
-            
-            return wasteitem
+        self._content.append(chkpt)
+        # always keep registry content sorted optimal-to-pessimal score
+        self._content = sorted(self._content, key=lambda c: c.score, reverse=self._reverse)
 
-        # score is not feasible - we do not need to do anythiong further
-        logger.debug(f'no-op: attempted registration of checkpoint with futile score < {score} >')
-        return None
+        logger.debug(f'registered new {qualifier or "feasible"} registry '
+                     f'item with metric score < {score} >')
+
+        if len(self._content) > self.capacity:
+            # pop worst-scoring item from the content list
+            wasteitem = self._content.pop(-1)
+        else:
+            wasteitem = None
+        
+        return wasteitem
+
+
+    def demote_current_optimal(self) -> None:
+        """Demote the current optimal ScoredCheckpoint member to `ScoreRank.FEASIBLE`"""
+        for checkpoint in self._content:
+            if checkpoint.rank is ScoreRank.OPTIMAL:
+                checkpoint.demote()
+                return
 
         
     def query_score_rank(self, score: Number) -> ScoreRank:
@@ -146,8 +145,8 @@ class Registry:
         Checks if the provided score constitutes a new optimal score, a feasible improvement
         or a non-viable, futile score compared to preexisting registry members.
         """
-        if self.population < self.capacity:
-            return ScoreRank.FEASIBLE
+        # if self.population < self.capacity:
+        #     return ScoreRank.FEASIBLE
 
         if self._score_preference is ScorePreference.HIGHER_IS_BETTER:
 
@@ -224,34 +223,43 @@ def get_registry_class(classname: str) -> type[Registry]:
 
 
 
-def create_score_registry(configuration: dict,
-                          checkpoint_directory: str | Path | None) -> Registry:
+
+DEFAULT_REGISTRY_CLASS_NAME: str = 'Registry'
+DEFAULT_CAPACITY: int = 1
+DEFAULT_SCORE_PREFERENCE_STR: str = 'higher_is_better'
+
+
+def create_score_registry(configuration: Mapping | None,
+                          checkpoint_directory: str | Path) -> Registry:
     """
-    Create the score registry from the top-level configuration dictionary.
+    Create the score registry from configuration dictionary. If not given,
+    create registry in its default flavour.
+
+    Parameters
+    ----------
+
+    configuration :  Mapping or None
+        Configuration for the score registry. Default values will be used
+        if configuration is `None`.
+
+    checkpoint_directory : str or pathlib.Path
+        Directory where the registry will save the checkpoints.
+        Must exist.
+
+    Returns
+    -------
+
+    registry : Registry
+        Initialized registry object.
     """
-    registry_config = configuration['trainer']['score_registry']
-    capacity = registry_config.get('capacity', 1)
-    preference = ScorePreference(registry_config['score_preference'])
-    registry_class = get_registry_class(registry_config['name'])
-
-    if not checkpoint_directory:
-        logger.info('Initializing registry checkpoint directory via deduction '
-                    'from top-level configuration.')
-        checkpoint_directory = create_default_checkpoint_directory(
-            configuration['experiment_directory']
-        )
-    else:
-        checkpoint_directory = Path(checkpoint_directory)
-    
-    handler = RWDHandler(directory=checkpoint_directory)
-    registry = registry_class(capacity=capacity, score_preference=preference,
-                              rwd_handler=handler)
-    return registry
-
-
-
-
-
-
-
-
+    checkpoint_directory = Path(checkpoint_directory)
+    if not checkpoint_directory.is_dir():
+        raise NotADirectoryError('creation of registry requires preexisting checkpoint directory')
+    configuration = LoggedDict(configuration or {}, logger)
+    registry_class = get_registry_class(configuration.get('name', DEFAULT_REGISTRY_CLASS_NAME))
+    capacity = configuration.get('capacity', default=DEFAULT_CAPACITY)
+    preference = ScorePreference(
+        configuration.get('score_preference', default=DEFAULT_SCORE_PREFERENCE_STR)
+    )
+    handler = RWDHandler(checkpoint_directory)
+    return registry_class(capacity=capacity, score_preference=preference, rwd_handler=handler)

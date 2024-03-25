@@ -13,15 +13,15 @@ logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
 CHECKPOINT_FILE_SUFFIX: str = 'pth'
 DEFAULT_PREFIX: str = 'chkpt'
-
+SEP: str = '_'
 
 def generate_filename(prefix: str | None = None, qualifier: str | None = None) -> str:
     """Generate filename for checkpoint"""
     prefix = prefix or DEFAULT_PREFIX
     if qualifier:
-        mid = ''.join(('-', qualifier, '-'))
+        mid = ''.join((SEP, qualifier, SEP))
     else:
-        mid= '-'
+        mid= SEP
     return f'{prefix}{mid}{uuid.uuid4()}.{CHECKPOINT_FILE_SUFFIX}'
 
 

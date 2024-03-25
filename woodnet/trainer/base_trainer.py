@@ -17,6 +17,9 @@ from woodnet.logtools.dict import LoggedDict
 from woodnet.custom.exceptions import ConfigurationError
 from woodnet.extent import compute_training_extent
 from woodnet.logtools.tensorboard import init_writer
+from woodnet.logtools.tensorboard.modelparameters.loggers import create_parameter_logger
+from woodnet.checkpoint.registry import create_score_registry
+
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
@@ -62,7 +65,9 @@ class Trainer:
                  use_inference_mode: bool,
                  save_model_checkpoint_every_n: int,
                  writer: SummaryWriter,
-                 parameter_logger: ParameterLogger | None
+                 parameter_logger: ParameterLogger | None,
+                 leave_total_progress: bool | None = None,
+                 name: str = 'notset'
                  ) -> None:
 
         self.model = model
@@ -108,6 +113,10 @@ class Trainer:
         self.logger.info(f'Moving model to device: \'{self.device}\'')
         self.model = self.model.to(device=self.device, dtype=self.dtype)
 
+        if leave_total_progress is not None:
+            self.leave_total_progress = leave_total_progress
+
+        self.name = name
 
     def train(self) -> None:
         loader = self.train_loader
@@ -302,7 +311,7 @@ class Trainer:
         if 'trainer' not in configuration:
             raise ConfigurationError('missing required trainer subconfiguration')
 
-        trainerconf = LoggedDict(deepcopy(configuration['trainer']), logger=logger)
+        trainerconf = LoggedDict(deepcopy(configuration['trainer']), logger)
         
         logger.info(f'Using training device: \'{device}\'')
         
@@ -337,10 +346,16 @@ class Trainer:
 
         # construct the score registry
         registry_conf = trainerconf.pop('score_registry', default=None)
+        registry = create_score_registry(configuration=registry_conf,
+                                         checkpoint_directory=handler.checkpoints_dir)
         
-        writer = init_writer(handler=handler)    
+        # construct the writer and the parameter loggers
+        writer = init_writer(handler=handler)
+        paramlogger_conf = trainerconf.pop('parameter_logger', default=None)
+        parameter_logger = create_parameter_logger(paramlogger_conf, writer)
+
         logger.debug(f'Injecting remaining kwargs into trainer constructor: {trainerconf}')
-        
+
         trainer = cls(
             model=model, optimizer=optimizer, criterion=criterion,
             loaders=loaders, handler=handler, validation_criterion=validation_criterion,
@@ -350,6 +365,9 @@ class Trainer:
             save_model_checkpoint_every_n=save_model_checkpoint_every_n,
             validation_metric=validation_metric,
             leave_total_progress=leave_total_progress,
+            writer=writer,
+            score_registry=registry,
+            parameter_logger=parameter_logger,
             **trainerconf
         )
 

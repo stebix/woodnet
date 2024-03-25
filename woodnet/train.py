@@ -96,6 +96,23 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     return loaders
 
 
+from woodnet.trainer import TrainerClass, retrieve_trainer_class
+
+
+def get_trainer_class(configuration: dict) -> TrainerClass:
+    """Extract the trainer class from the top-level configuration."""
+    if 'trainer' not in configuration:
+        raise ConfigurationError('missing required trainer subconfiguration')
+    
+    subconfig = configuration.get('trainer')
+    class_name = logged.get(subconfig, 'name')
+    trainer_class = retrieve_trainer_class(class_name)
+    return trainer_class
+
+
+
+
+
 def create_trainer(configuration: dict,
                    model: torch.nn.Module | Callable,
                    handler: ExperimentDirectoryHandler,
@@ -216,16 +233,24 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
     logger.info(f'Created criterion: {criterion}')
 
     loaders = create_loaders(configuration)
+    device = torch.device(logged.get(configuration, key='device', default='cpu'))
 
-    trainer = create_trainer(configuration=configuration, model=model, optimizer=optimizer,
-                             criterion=criterion, loaders=loaders, handler=handler,
-                             validation_criterion=None,
-                             leave_total_progress=True)
-
-    logger.info(f'Succesfully created trainer object. initializing core training loop')
+    trainer_class = get_trainer_class(configuration)
+    trainer = trainer_class.create(
+        configuration=configuration,
+        model=model,
+        handler=handler,
+        device=device,
+        optimizer=optimizer,
+        criterion=criterion,
+        loaders=loaders,
+        validation_criterion=None,
+        leave_total_progress=True
+    )
+    logger.info(f'Successfully created trainer object. initializing core training loop')
     trainer.train()
 
-    logger.info('Succesfully concluded train method.')
+    logger.info('Successfully concluded train method.')
 
 
 def crawl_configurations(directory: Path, /) -> list[dict]:
