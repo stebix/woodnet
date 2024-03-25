@@ -145,8 +145,15 @@ class Registry:
         Checks if the provided score constitutes a new optimal score, a feasible improvement
         or a non-viable, futile score compared to preexisting registry members.
         """
-        # if self.population < self.capacity:
-        #     return ScoreRank.FEASIBLE
+        if self.population < self.capacity:
+            # here we can always keep the insertion, but we need to know optimality
+            if (self._score_preference is ScorePreference.HIGHER_IS_BETTER and
+                    score > self.current_max_score):
+                return ScoreRank.OPTIMAL
+            if (self._score_preference is ScorePreference.LOWER_IS_BETTER and
+                    score < self.current_min_score):
+                return ScoreRank.OPTIMAL
+            return ScoreRank.FEASIBLE
 
         if self._score_preference is ScorePreference.HIGHER_IS_BETTER:
 

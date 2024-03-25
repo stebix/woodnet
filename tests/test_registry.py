@@ -76,23 +76,27 @@ def test_register_on_empty_registry(model, tmp_path):
                           (ScorePreference.LOWER_IS_BETTER, False)])
 def test_registry_sorts_best_to_worst(model,
                                       preference,
-                                      reverse):
+                                      reverse,
+                                      tmp_path):
     capacity = 6
-    handler = MockCRDHandler()
+    handler = RWDHandler(directory=tmp_path)
     registry = Registry(capacity=capacity, score_preference=preference,
                         rwd_handler=handler)
 
-    all_scores = [0.6, 0.8, 0.3, 0.5, 0.33, 0.75]
+    pre_scores = [0.6, 0.8, 0.3, 0.5]
+    post_scores = [0.33, 0.75]
     # prefill two items to allow ordering
-    for s in all_scores[:2]:
+    for s in pre_scores:
         registry.register(item=(s, model))
 
     # fill registry
-    for i, s in enumerate(all_scores[2:], start=2):
+    for i, s in enumerate(post_scores, start=1):
         retitem = registry.register(item=(s, model))
-        expected_scores = np.array(sorted(all_scores[:i+1], reverse=reverse))
+        scores = pre_scores + post_scores[:i]
+        expected_scores = np.array(sorted(scores, reverse=reverse))
         registry_scores = np.array(registry.scores)
         assert np.allclose(registry_scores, expected_scores)
+        assert retitem is None, 'capacity should allow all items inside'
 
 
 def test_registry_population_does_not_exceed_capacity(model, tmp_path):
