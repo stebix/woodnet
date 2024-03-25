@@ -105,7 +105,7 @@ def get_trainer_class(configuration: dict) -> TrainerClass:
         raise ConfigurationError('missing required trainer subconfiguration')
     
     subconfig = configuration.get('trainer')
-    class_name = logged.get(subconfig, 'name')
+    class_name = logged.get(subconfig, 'name', 'Trainer')
     trainer_class = retrieve_trainer_class(class_name)
     return trainer_class
 
