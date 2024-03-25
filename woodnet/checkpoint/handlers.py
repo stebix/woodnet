@@ -3,9 +3,10 @@ import logging
 import torch
 import json
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Literal
 
 
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
@@ -51,6 +52,7 @@ class RWDHandler:
     "Read - Write - Delete - Handler `CRDHandler` for checkpoint files."""
     directory: Path
     prefix: str | None = None
+    serialization_target: Literal['state_dict', 'module'] = 'state_dict'
 
     def write(self,
               model: torch.nn.Module,
@@ -75,9 +77,17 @@ class RWDHandler:
         if savepath.exists():
             raise FileExistsError(f'attempting to overwrite preexisting file at '
                                   f'\'{savepath.resolve()}\' with model file')
-        torch.save(model, f=savepath, **kwargs)
+        torch.save(
+            self.extract_serialization_target(model),
+            f=savepath, **kwargs)
         logger.info(f'successfully saved checkpoint file to location \'{savepath}\'')
         return savepath
+
+
+    def extract_serialization_target(self, model: torch.nn.Module):
+        if self.serialization_target == 'state_dict':
+            return model.state_dict()
+        return model
 
 
     def write_json(self, data: Mapping, filename: str) -> Path:
