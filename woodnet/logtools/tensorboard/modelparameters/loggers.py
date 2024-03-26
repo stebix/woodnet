@@ -13,7 +13,7 @@ from woodnet.logtools.tensorboard.modelparameters.extraction import extract_simp
 from woodnet.logtools.dict import LoggedDict
 
 
-DEFAULT_LOGGER_NAME: str = '.'.join(('main', __file__))
+DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
 DEFAULT_PARAMETER_LOGGER_NAME: str = 'VoidLogger'
