@@ -51,6 +51,10 @@ class HistogramLogger:
             self.writer.add_histogram(tag=name, values=weightarray,
                                       global_step=iteration)
 
+            # TODO: REMOVE
+            logger.debug(f'add_histogram call with tag \'{name}\', '
+                         f'values shape {weightarray.shape} and iteration {iteration}')
+
     def log_gradients(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model gradients at iteration {iteration}')
         logger.warning('currently dummy method')
