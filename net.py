@@ -10,7 +10,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument('task', type=str, choices=['train', 'batchtrain', 'predict'],
                         help='Choose training and prediction action.')
 
-    parser.add_argument('configuration', type=str,
+    parser.add_argument('configuration', type=str, nargs='+',
                         help='Location of the configuration YAML file that fully defines '
                              'the experiment run. Must match the beforehand selected action '
                              'and can thus be a training or prediction configuration.')
@@ -27,7 +27,9 @@ def main() -> None:
     args = cli()
 
     if args.task == 'train':
-        run_training_experiment(args.configuration)
+        if len(args.configuration) > 1:
+            raise RuntimeError('train verb allows only single configurations')
+        run_training_experiment(args.configuration[0])
     elif args.task == 'batchtrain':
         # TODO: include subparser for multiple number of arguments
         run_training_experiment_batch([args.configuration])
