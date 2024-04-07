@@ -18,8 +18,12 @@ def test_manual_extraction():
 
     net_fast = torch.compile(net)
 
+    # net =
+
     parameters, _ = extract_simple_resnet_parameters(net_fast)
     parameters = convert_to_flat(parameters)
+
+    print(f'unrecognized is: {_}')
 
     for key, value in parameters.items():
         print(f'{key} :: {type(value)} :: {value.shape}')

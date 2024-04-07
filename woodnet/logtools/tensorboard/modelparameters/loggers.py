@@ -42,11 +42,26 @@ class HistogramLogger:
 
     def __init__(self, writer: SummaryWriter) -> None:
         self.writer = writer
+        self.is_first = True
 
     def log_weights(self, model: Module, iteration: int) -> None:
+
+        if self.is_first:
+            logger.debug(f'first logging weights with model {model.__class__.__name__}')
+            self.is_first = False
+
+        if hasattr(model, '_orig_mod'):
+            logger.debug('Detected torch JIT-compiled model, using \'_orig_mod\' atribute.')
+            model = model._orig_mod
+
         logger.debug(f'logging model weights at iteration {iteration}')
         nested_name_weights_mapping, _ = extract_simple_resnet_parameters(model)
         weights = convert_to_flat(nested_name_weights_mapping)
+
+        logger.debug(f'retrieved weights keys {weights.keys()}')
+        logger.debug(f'retrieved unrecognized {_}')
+
+
         for name, weightarray in weights.items():
             self.writer.add_histogram(tag=name, values=weightarray,
                                       global_step=iteration)
@@ -54,6 +69,8 @@ class HistogramLogger:
             # TODO: REMOVE
             logger.debug(f'add_histogram call with tag \'{name}\', '
                          f'values shape {weightarray.shape} and iteration {iteration}')
+
+
 
     def log_gradients(self, model: Module, iteration: int) -> None:
         logger.debug(f'logging model gradients at iteration {iteration}')
