@@ -1,4 +1,5 @@
 import numpy as np
+from numbers import Number
 
 from woodnet.evaluation.metrics import (compute_TPR, compute_TNR, compute_ACC,
                                         compute_MCC, compute_F1, Cardinalities)
@@ -83,6 +84,18 @@ class TrackedCardinalities(_TrackedQuantity):
     
     def __repr__(self) -> str:
         return self.__str__()
+    
+
+    def state_dict(self) -> dict[str, Number | None]:
+        """
+        Current state dict of the tracked cardinalities, i.e. mapping
+        from name to current values.
+        """
+        state_dict = {
+            name : getattr(self, name)
+            for name in self.joint_identifiers
+        }
+        return state_dict
             
     
     @staticmethod
