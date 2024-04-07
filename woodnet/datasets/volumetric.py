@@ -101,17 +101,22 @@ class TileDataset(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return len(self.tilebuilder.tiles)
-    
 
-    def __str__(self) -> str:
+    
+    def _make_info_str(self) -> str:
         has_transformer = True if self.transformer else False
-        s = f'{self.__class__.__name__}('
         infos = ', '.join((
             f"path='{self.path}'", f"phase='{self.phase}'",
             f"baseshape={self.baseshape}", f"tileshape={self.tileshape}",
             f"classlabel_mapping={self.classlabel_mapping}",
             f"has_transformer={has_transformer}"
         ))
+        return infos
+    
+
+    def __str__(self) -> str:
+        s = f'{self.__class__.__name__}('
+        infos = self._make_info_str()
         return ''.join((s, infos, ')'))
     
 
