@@ -11,6 +11,7 @@ import torch.amp
 import torch.utils
 import tqdm
 
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
@@ -172,6 +173,15 @@ def deduce_loader_from_training(configuration: Mapping,
                                          num_workers=num_workers, pin_memory=pin_memory,
                                          shuffle=False)
     return loader
+
+
+
+def transmogrify_state_dict(state_dict: Mapping) -> OrderedDict:
+    """
+    Try to turn state dict from compiled model into normal state dict.
+    """
+    prefix: str = '_orig_mod.'
+    return OrderedDict({key.removeprefix(prefix) : value for key, value in state_dict.items()})
 
 
 
