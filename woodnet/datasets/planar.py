@@ -6,12 +6,14 @@ Jannik Stebani 2023
 import torch
 import numpy as np
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from torch import Tensor
 from typing import Optional, Literal, Union
 
 from woodnet.datasets import add_channel_dim
 from woodnet.dataobjects import AbstractSlice, Volume
+
+from woodnet.inference.parametrized_transforms import ParametrizedTransform
 
 
 class SliceDataset(torch.utils.data.Dataset):
@@ -116,3 +118,21 @@ class EagerSliceDataset(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return self.volume.shape[0]
+    
+
+
+
+class TransformedEagerSliceDatasetBuilder:
+    """
+    Programmatic dataset builder.
+    """
+    @classmethod
+    def build(cls,
+              instances_ID: Iterable[str],
+              phase: Literal['train'] | Literal['val'] | Literal['test'],
+              axis: int,
+              transform_configurations: Iterable[dict] | None = None,
+              parametrized_transform: ParametrizedTransform | None = None
+              ) -> list[EagerSliceDataset]:
+
+        raise NotImplementedError('do it')
