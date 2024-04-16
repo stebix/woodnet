@@ -4,8 +4,9 @@ configuration dictionary data to process them via downstream CLI.
 
 @jsteb 2023
 """
-import pathlib
 import pydantic
+
+from typing import Union, Literal
 
 from typing_extensions import Annotated
 from annotated_types import Gt
@@ -62,9 +63,25 @@ class ValidationLoader(Config):
     transform_configurations: list[Transformation] | None = None
 
 
-class Loaders(Config):
-    """Training and validation loaders."""
-    dataset: str
+class PlanarLoaders(Config):
+    """Training and validation loaders for 2D planar setup."""
+    dataset: Literal['EagerSliceDataset', 'SliceDataset']
+    axis: int
+    num_workers: int | None = None
+    batchsize: int | None = None
+    pin_memory: bool | None = None
+
+    train: TrainingLoader
+    val: ValidationLoader
+
+    def dataset_kwargs(self) -> dict:
+        return {'axis' : self.axis}
+
+
+class TriaxialLoaders(Config):
+    """Training and validation loaders for 2.5D triaxial setup."""
+    dataset: Literal['TriaxialDataset']
+    planestride: tuple[int, int, int]
     num_workers: int | None = None
     batchsize: int | None = None
     tileshape: tuple[int, int, int] | None = None
@@ -72,6 +89,25 @@ class Loaders(Config):
 
     train: TrainingLoader
     val: ValidationLoader
+
+    def dataset_kwargs(self) -> dict:
+        return {'planestride' : self.planestride, 'tileshape' : self.tileshape}
+
+
+class VolumetricLoaders(Config):
+    """Training and validation loaders for 3D volumetric setup."""
+    dataset: Literal['TileDataset']
+    num_workers: int | None = None
+    batchsize: int | None = None
+    tileshape: tuple[int, int, int] | None = None
+    pin_memory: bool | None = None
+
+    train: TrainingLoader
+    val: ValidationLoader
+
+    def dataset_kwargs(self) -> dict:
+        return {'tileshape' : self.tileshape}
+
 
 
 class TrainingConfiguration(Config):
@@ -82,7 +118,9 @@ class TrainingConfiguration(Config):
     optimizer: Optimizer
     loss: Loss
     trainer: Trainer
-    loaders: Loaders
+    loaders: Union[PlanarLoaders,
+                   TriaxialLoaders,
+                   VolumetricLoaders] = pydantic.Field(..., discriminator='dataset')
 
 
 
