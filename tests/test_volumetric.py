@@ -3,7 +3,7 @@ import torch
 import pytest
 
 from woodnet.datasets import DEFAULT_CLASSLABEL_MAPPING
-from woodnet.datasets.volumetric_inference import InferenceTileDataset, ParametrizedTransform
+from woodnet.datasets.volumetric_inference import TransformedTileDataset, ParametrizedTransform
 
 
 def normalize(inputs):
@@ -34,7 +34,7 @@ def test_correct_workings_of_parametrized_transform(caplog, name, transform, con
         'transformer' : normalize,
         'classlabel_mapping' : DEFAULT_CLASSLABEL_MAPPING
     }
-    dataset = InferenceTileDataset(**conf)
+    dataset = TransformedTileDataset(**conf)
     dataset.parametrized_transform = ptf
     for data, _ in dataset:
         assert torch.allclose(data, const)
