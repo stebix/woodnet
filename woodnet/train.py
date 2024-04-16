@@ -349,10 +349,20 @@ def run_training_experiment_batch(configurations: Iterable[dict | Path | str]) -
 
         loaders = create_loaders(configuration)
 
-        trainer = create_trainer(configuration=configuration, model=model, optimizer=optimizer,
-                                 criterion=criterion, loaders=loaders, handler=handler,
-                                 validation_criterion=None,
-                                 leave_total_progress=False)
+        device = torch.device(logged.get(configuration, key='device', default='cpu'))
+
+        trainer_class = get_trainer_class(configuration)
+        trainer = trainer_class.create(
+            configuration=configuration,
+            model=model,
+            handler=handler,
+            device=device,
+            optimizer=optimizer,
+            criterion=criterion,
+            loaders=loaders,
+            validation_criterion=None,
+            leave_total_progress=False
+        )
 
         logger.info(f'Succesfully created trainer object. initializing core training loop')
         trainer.train()
