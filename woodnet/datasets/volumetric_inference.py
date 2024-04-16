@@ -2,28 +2,22 @@ import logging
 import torch
 
 from pathlib import Path
-from typing import Any, NamedTuple
-from collections.abc import Callable, Mapping
+from typing import Any, Literal, Union
+from collections.abc import Callable, Iterable
 
 from torch import Tensor
 
-from woodnet.datasets.volumetric import TileDataset
-
+from woodnet.datasets.volumetric import BaseTileDatasetBuilder, TileDataset
+from woodnet.inference.parametrized_transforms import ParametrizedTransform
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
 
-class ParametrizedTransform(NamedTuple):
-    name: str
-    parameters: Mapping
-    transform: Callable
-
-
-
-class InferenceDatasetMixin:
+class ParametrizedTransformMixin:
     """
-    Provide facilities for changeable parametrized transforms.
+    Provide facilities for changeable parametrized transforms that modify the
+    dataset output.
     """
     @property
     def parametrized_transform(self) -> ParametrizedTransform:
@@ -45,12 +39,15 @@ class InferenceDatasetMixin:
 
 
 
-class InferenceTileDataset(TileDataset, InferenceDatasetMixin):
+class TransformedTileDataset(TileDataset, ParametrizedTransformMixin):
     """
-    TileDataset specialized for inference ablation experiments.
+    TileDataset specialized for inference-time data-transform robustness experiments.
 
-    In comparison to the bog-standard dataset, this class provides facilities to
-    inject a `parametrized_transform` that globally modifies the output.
+    The idea is that for inference-time robustness experiments, we provide facilities
+    to include swappable parametrized transforms that modify the data.
+    Compared to the standard transformer, these parametrized transforms are expected to be
+    change many times over the dataset lifetime since we want to measure the model
+    robustness for variable-strength transforms.
     """
     def __init__(self,
                  path: str | Path,
@@ -58,9 +55,9 @@ class InferenceTileDataset(TileDataset, InferenceDatasetMixin):
                  transformer: Callable[..., Any] | None = None,
                  parametrized_transform: Callable[[Tensor], Tensor] | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
-                 internal_path: str = 'downsampled/half') -> None:
+                 internal_path: str = 'downsampled/half',
+                 phase: Literal['val'] = 'val') -> None:
         
-        phase: str = 'val'
         super().__init__(path, phase, tileshape, transformer, classlabel_mapping, internal_path)
         self._parametrized_transform = parametrized_transform
         
@@ -90,15 +87,75 @@ class InferenceTileDataset(TileDataset, InferenceDatasetMixin):
 
     def _make_info_str(self) -> str:
         has_transformer = True if self.transformer else False
-        parametrized_transform = {
-            'name' : self.parametrized_transform.name,
-            'parameters' : self.parametrized_transform.parameters
-        }
+        if self.parametrized_transform:
+            parametrized_transform_info = {
+                'name' : self.parametrized_transform.name,
+                'parameters' : self.parametrized_transform.parameters
+            }
+        else:
+            parametrized_transform_info = None
         infos = ', '.join((
             f"path='{self.path}'", f"phase='{self.phase}'",
             f"baseshape={self.baseshape}", f"tileshape={self.tileshape}",
             f"classlabel_mapping={self.classlabel_mapping}",
             f"has_transformer={has_transformer}",
-            f'parametrized_transform={parametrized_transform}'
+            f'parametrized_transform={parametrized_transform_info}'
         ))
         return infos
+
+
+
+class TransformedTileDatasetBuilder(BaseTileDatasetBuilder):
+    """Build a TransformedTileDataset without a parametrized transform. Add this externally."""
+    def build(cls,
+              instances_ID: Iterable[str],
+              tileshape: tuple[int, int, int],
+              transform_configurations: Iterable[dict] | None = None,
+              parametrized_transform: ParametrizedTransform | None = None
+              ) -> list[TransformedTileDataset]:
+        return super().build(TransformedTileDataset, instances_ID, 'val',
+                             tileshape, transform_configurations,
+                             parametrized_transform=parametrized_transform)
+
+
+
+DataProvider = Union[torch.utils.data.Dataset, torch.utils.data.ConcatDataset,
+                     list[torch.utils.data.Dataset], tuple[torch.utils.data.Dataset]]
+
+
+def set_parametrized_transform(data: DataProvider, /, transform: ParametrizedTransform) -> None:
+    """
+    In-place set the parametrized transform of the given data provider.
+    The abstract data provider may be a single dataset, a composite
+    `torch.utils.data.ConcatDataset` or a list/tuple of `torch.utils.data.Dataset`. 
+    The underlying datasets shoudl possess the `ParametrizedTransformMixin`
+    to understand the role of the parametrized transform.
+
+    Parameters
+    ----------
+
+    data : DataProvider, i.e. Dataset, ConcatDataset or list/tuple of Dataset
+        Source data on which the parametrized_transform attribute will
+        be set.
+    
+    transform : ParametrizedTransform
+        Parametrized transformation globally applied on the dataset.
+
+    Returns
+    -------
+
+    None
+        Data(sets) are modified in-place.
+    """
+    if isinstance(data, torch.utils.data.ConcatDataset):
+        for subset in data.datasets:
+            subset.parametrized_transform = transform
+    elif isinstance(data, (list, tuple)):
+        for element in data:
+            element.parametrized_transform = transform
+    # TODO: this breaks probably when the transformed dataset hierarchy is extended
+    # to the other datasets.
+    elif isinstance(data, torch.utils.data.Dataset):
+        data.parametrized_transform = transform
+    else:
+        raise TypeError(f'cannot set parametrized transform on invalid type {type(data)}')
