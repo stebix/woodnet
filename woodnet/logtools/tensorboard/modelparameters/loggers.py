@@ -88,7 +88,7 @@ class HistogramLogger:
 
         logger.debug(f'logging model gradients at iteration {iteration}')
         nested_name_gradients_mapping, _ = extract_simple_resnet_gradients(model)
-        weights = convert_to_flat(nested_name_gradients_mapping)
+        weights = convert_to_flat(nested_name_gradients_mapping, suffix='_grad')
 
         logger.debug(f'retrieved weights keys {weights.keys()}')
         logger.debug(f'retrieved unrecognized {_}')
