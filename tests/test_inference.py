@@ -6,12 +6,12 @@ from ruamel.yaml import YAML
 
 
 from woodnet.datasets.volumetric_inference import (TransformedTileDatasetBuilder,
-                                                   TransformedTileDataset,
-                                                   set_parametrized_transform)
-from woodnet.inference.evaluate import evaluate, evaluate_multiple
-from woodnet.inference.predictor import Predictor
+                                                   TransformedTileDataset)
+
+from woodnet.inference.evaluate import evaluate, evaluate_multiple, Predictor
 from woodnet.inference.inference import (create_parametrized_transforms,
                                          extract_IDs, extract_model_config)
+
 from woodnet.models.volumetric import ResNet3D
 from woodnet.inference.parametrized_transforms import (CongruentTransformList,
                                                        ParametrizedTransform,
@@ -217,7 +217,7 @@ class Test_evaluate:
         batch_size: int = 64
         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
         result = evaluate(model,
-                          transforms=smooth_transforms,
+                          parametrizations=smooth_transforms,
                           loader=loader,
                           device=device,
                           dtype=dtype,
