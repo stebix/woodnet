@@ -1,13 +1,17 @@
 """
-Implement interfacing container classes for the transformation pieplines.
+Implement interfacing container classes for the transformation pipelines.
 
 Jannik Stebani 2023
 """
 import torch
 
+from collections.abc import Callable
+
+TensorTransform = Callable[[torch.Tensor], torch.Tensor] | torch.nn.Module
+
 class Transformer:
 
-    def __init__(self, *transforms: torch.nn.Module) -> None:
+    def __init__(self, *transforms: TensorTransform) -> None:
         self.transforms = transforms
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
