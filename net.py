@@ -27,12 +27,12 @@ def main() -> None:
     args = cli()
 
     if args.task == 'train':
-        if len(args.configuration) > 1:
-            raise RuntimeError('train verb allows only single configurations')
+        if len(args.configuration) != 1:
+            raise RuntimeError('train verb requires singular configuration specification')
         run_training_experiment(args.configuration[0])
     elif args.task == 'batchtrain':
-        # TODO: include subparser for multiple number of arguments
-        run_training_experiment_batch([args.configuration])
+        # TODO: maybe more clean if we include subparser for multiple number of arguments
+        run_training_experiment_batch(args.configuration)
     elif args.task == 'predict':
         run_prediction_experiment(args.configuration)
         
