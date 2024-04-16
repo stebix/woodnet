@@ -125,20 +125,25 @@ class TileDataset(torch.utils.data.Dataset):
     
 
 
-class TileDatasetBuilder:
+class BaseTileDatasetBuilder:
     """
     Build a 3D TileDataset programmatically.
+
+    Thin class, basically acts as a namespace. Maybe move to module?
     """
     internal_path: str = 'downsampled/half'
     classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
     # TODO: factor hardcoded paths out -> bad!
-    base_directory = '/home/jannik/storage/wood/custom/'
-    pretty_phase_name_map = {'val' : 'validation', 'train' : 'training'}
+    base_directory: Path = Path('/home/jannik/storage/wood/custom/')
+    pretty_phase_name_map = {'val' : 'validation', 'train' : 'training', 'test' : 'testing'}
 
     def build(cls,
+              dataset_class: type,
               instances_ID: Iterable[str],
-              phase: Literal['train', 'val'], tileshape: tuple[int],
-              transform_configurations: Iterable[dict] | None = None
+              phase: Literal['train', 'val', 'test'],
+              tileshape: tuple[int, int, int],
+              transform_configurations: Iterable[dict] | None = None,
+              **kwargs
               ) -> list[TileDataset]:
         
         datasets = []
@@ -155,11 +160,12 @@ class TileDatasetBuilder:
         for ID in wrapped_IDs:
             wrapped_IDs.set_postfix_str(f'current_ID=\'{ID}\'')
             path = cls.get_path(ID)        
-            dataset = TileDataset(
+            dataset = dataset_class(
                 path=path, phase=phase, tileshape=tileshape,
                 transformer=transformer,
                 classlabel_mapping=cls.classlabel_mapping,
-                internal_path=cls.internal_path
+                internal_path=cls.internal_path,
+                **kwargs
             )
             datasets.append(dataset)
         return datasets
@@ -167,10 +173,25 @@ class TileDatasetBuilder:
 
     @classmethod
     def get_path(cls, ID: str) -> Path:
-        base_directory = Path(cls.base_directory)
-        for child in base_directory.iterdir():
+        for child in cls.base_directory.iterdir():
             if child.match(f'*/{ID}*'):
                 return child
         raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
-                                f'basedir "{base_directory}"')
+                                f'basedir "{cls.base_directory}"')
 
+
+
+class TileDatasetBuilder(BaseTileDatasetBuilder):
+    """
+    Builder for the standard TileDataset for training, validation and testing.
+    """
+    def build(cls,
+              instances_ID: Iterable[str],
+              phase: Literal['train'] | Literal['val'] | Literal['test'],
+              tileshape: tuple[int, int, int],
+              transform_configurations: Iterable[dict] | None = None
+              ) -> list[TileDataset]:
+        
+        return super().build(TileDataset, instances_ID, phase,
+                             tileshape, transform_configurations)
+    
