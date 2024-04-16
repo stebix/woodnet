@@ -63,12 +63,12 @@ def mkdir_logged(dirpath: Path, allow_preexisting: bool,
             raise e
     except FileNotFoundError as e:
         if parents:
-            logger.info(f'Creating new {name} directory \'{dirpath}\' with deep parent tree')
+            logger.info(f'Creating new{name} directory \'{dirpath}\' with deep parent tree')
             dirpath.mkdir(parents=True)
         else:
             raise e
     else:
-        logger.info(f'Created new {name} directory \'{dirpath}\'')
+        logger.info(f'Created new{name} directory \'{dirpath}\'')
     return dirpath
         
 
