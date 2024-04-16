@@ -107,7 +107,7 @@ def generate_fold_directory(p: PathLike, foldnum: int) -> str:
         if foldnum != (previous_foldnum + 1):
             message = (f'indicated fold number {foldnum} is non-consecutive to '
                        f'previous: {previous_foldnum}')
-            logger.warning()
+            logger.warning(message)
         dirpath = p.parent / f'{prefix}-{foldnum}'
     return str(dirpath)
 
