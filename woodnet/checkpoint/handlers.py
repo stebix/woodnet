@@ -32,7 +32,7 @@ def softcheck_filename(filepath: Path, /, action_verb: str = 'encountered') -> N
     non-conforming.
 
     Parameters
-    ==========
+    ----------
 
     filepath : Path
         Location on file system.
@@ -63,7 +63,7 @@ class RWDHandler:
         directory.
 
         Parameters
-        ==========
+        ----------
 
         model: torch.nn.Module
             The model file.
@@ -115,7 +115,7 @@ class RWDHandler:
         Note that you can specify either the file name or the full path.
 
         Parameters
-        ==========
+        ----------
 
         name: str, optional
             Load the pickled model file with the indicated file name.
@@ -128,7 +128,7 @@ class RWDHandler:
             load function.
 
         Returns
-        =======
+        -------
 
         model: torch.nn.Module
             The loaded model file.
