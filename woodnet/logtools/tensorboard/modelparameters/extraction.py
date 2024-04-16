@@ -151,7 +151,7 @@ def extract_simple_resnet_gradients(model: torch.nn.Module) -> tuple[dict, list[
 
 
 
-def convert_to_flat(d: dict) -> dict[str, np.ndarray]:
+def convert_to_flat(d: dict, prefix: str = '', suffix: str = '') -> dict[str, np.ndarray]:
     """
     Convert nested layer-specifying dictionary to flat
     tag-to-parameter array dictionary.
@@ -161,7 +161,7 @@ def convert_to_flat(d: dict) -> dict[str, np.ndarray]:
         for sublayer_ID, sublayer in sublayermapping.items():
             for opname, valuemapping in sublayer.items():
                 for valuename, valuearray in valuemapping.items():
-                    tag = f'{layername}/sublayer_{sublayer_ID}/{opname}/{valuename}'
+                    tag = f'{prefix}{layername}{suffix}/sublayer_{sublayer_ID}/{opname}/{valuename}'
                     if isinstance(valuearray, (list, tuple)):
                         valuearray = np.concatenate([w.flatten() for w in valuearray], axis=0)
                     else:
