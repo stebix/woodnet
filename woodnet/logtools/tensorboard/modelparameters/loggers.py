@@ -9,7 +9,9 @@ from collections.abc import Mapping
 from torch.nn.modules import Module
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from woodnet.logtools.tensorboard.modelparameters.extraction import extract_simple_resnet_parameters, convert_to_flat
+from woodnet.logtools.tensorboard.modelparameters.extraction import (extract_simple_resnet_parameters,
+                                                                     extract_simple_resnet_gradients,
+                                                                     convert_to_flat)
 from woodnet.logtools.dict import LoggedDict
 
 
@@ -42,13 +44,15 @@ class HistogramLogger:
 
     def __init__(self, writer: SummaryWriter) -> None:
         self.writer = writer
-        self.is_first = True
+        self._is_first_weightlog = True
+        self._is_first_gradlog = True
+
 
     def log_weights(self, model: Module, iteration: int) -> None:
-
-        if self.is_first:
+        """Log gradients of ResNet model to tensorboard."""
+        if self._is_first_weightlog:
             logger.debug(f'first logging weights with model {model.__class__.__name__}')
-            self.is_first = False
+            self._is_first_weightlog = False
 
         if hasattr(model, '_orig_mod'):
             logger.debug('Detected torch JIT-compiled model, using \'_orig_mod\' atribute.')
@@ -73,9 +77,29 @@ class HistogramLogger:
 
 
     def log_gradients(self, model: Module, iteration: int) -> None:
+        """Log gradients of ResNet model to tensorboard."""
+        if self._is_first_gradlog:
+            logger.debug(f'first logging gradients with model {model.__class__.__name__}')
+            self._is_first_gradlog = False
+
+        if hasattr(model, '_orig_mod'):
+            logger.debug('Detected torch JIT-compiled model, using \'_orig_mod\' atribute.')
+            model = model._orig_mod
+
         logger.debug(f'logging model gradients at iteration {iteration}')
-        logger.warning('currently dummy method')
-        pass
+        nested_name_gradients_mapping, _ = extract_simple_resnet_gradients(model)
+        weights = convert_to_flat(nested_name_gradients_mapping)
+
+        logger.debug(f'retrieved weights keys {weights.keys()}')
+        logger.debug(f'retrieved unrecognized {_}')
+
+        for name, weightarray in weights.items():
+            self.writer.add_histogram(tag=name, values=weightarray,
+                                      global_step=iteration)
+            # TODO: REMOVE
+            logger.debug(f'add_histogram call with tag \'{name}\', '
+                         f'values shape {weightarray.shape} and iteration {iteration}')
+
 
     def __str__(self) -> str:
         return self.__repr__()

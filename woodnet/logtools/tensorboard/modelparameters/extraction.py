@@ -45,7 +45,22 @@ def extract_weigths(name: str, module: torch.nn.Module) -> dict:
         if values is not None:
             weights[module_type][weight_type] = values.detach().cpu().numpy()
     return weights
+
+
+def extract_gradients(name: str, module: torch.nn.Module) -> dict:
+    gradients = defaultdict(dict)
+    module_type, index = name.split('_')
+    
+    if module_type not in {'conv', 'bn'}:
+        warnings.warn(f'extracting weights from unusually named module \'{name}\'')
         
+    weight_types = ('weight', 'bias')
+    for weight_type in weight_types:
+        values = getattr(module, weight_type)
+        if values is not None:
+            gradients[module_type][weight_type] = values.grad.detach().cpu().numpy()
+    return gradients
+
 
 def extract_weights_from_ResNetBlock(rnblk: ResNetBlock) -> dict[str, np.ndarray]:
     weightvectors = defaultdict(lambda: defaultdict(list))
@@ -63,6 +78,25 @@ def extract_weights_from_ResNetBlock(rnblk: ResNetBlock) -> dict[str, np.ndarray
                 values.detach().cpu().numpy()
             )
     return weightvectors
+
+
+def extract_gradients_from_ResNetBlock(rnblk: ResNetBlock) -> dict[str, np.ndarray]:
+    gradientvectors = defaultdict(lambda: defaultdict(list))
+    names = ('conv', 'bn')
+    indices = (1, 2)
+    types = ('weight', 'bias')
+
+    for name, index, type in product(names, indices, types):
+        module_name = f'{name}_{index}'
+        module = getattr(rnblk, module_name)
+        values = getattr(module, type)
+        # skip appending empty/None values, e.g. for non-bias-carrying norm layers
+        if values is not None:
+            gradientvectors[name][type].append(
+                values.grad.detach().cpu().numpy()
+            )
+    return gradientvectors
+
 
 
 def export_parameters(p: torch.Tensor) -> np.ndarray:
@@ -97,6 +131,26 @@ def extract_simple_resnet_parameters(model: torch.nn.Module) -> tuple[dict, list
     return (parameters, skipped_children)
 
 
+
+def extract_simple_resnet_gradients(model: torch.nn.Module) -> tuple[dict, list[str]]:
+    skipped_children: list[str] = []
+    gradients = defaultdict(lambda: defaultdict(dict))
+    for name, child in model.named_children():
+        
+        if is_simple_resnet_layer(name, child):
+            for index, subblock in child.named_children():
+                gradients[name][index] = extract_gradients_from_ResNetBlock(subblock)
+        
+        elif name in {'conv_1', 'bn_1'}:
+            gradients['layer_0']['0'].update(extract_gradients(name, child))
+        
+        else:
+            skipped_children.append(name)
+    
+    return (gradients, skipped_children)
+
+
+
 def convert_to_flat(d: dict) -> dict[str, np.ndarray]:
     """
     Convert nested layer-specifying dictionary to flat
@@ -105,12 +159,12 @@ def convert_to_flat(d: dict) -> dict[str, np.ndarray]:
     flat = {}
     for layername, sublayermapping in d.items():
         for sublayer_ID, sublayer in sublayermapping.items():
-            for opname, weightmapping in sublayer.items():
-                for weightname, weightarray in weightmapping.items():
-                    tag = f'{layername}/sublayer_{sublayer_ID}/{opname}/{weightname}'
-                    if isinstance(weightarray, (list, tuple)):
-                        weightarray = np.concatenate([w.flatten() for w in weightarray], axis=0)
+            for opname, valuemapping in sublayer.items():
+                for valuename, valuearray in valuemapping.items():
+                    tag = f'{layername}/sublayer_{sublayer_ID}/{opname}/{valuename}'
+                    if isinstance(valuearray, (list, tuple)):
+                        valuearray = np.concatenate([w.flatten() for w in valuearray], axis=0)
                     else:
-                        weightarray = weightarray.flatten()
-                    flat[tag] = weightarray.flatten()
+                        valuearray = valuearray.flatten()
+                    flat[tag] = valuearray.flatten()
     return flat
