@@ -147,12 +147,15 @@ def set_parametrized_transform(data: DataProvider, /, transform: ParametrizedTra
     None
         Data(sets) are modified in-place.
     """
+    # pretty bad solution eh lol
     if isinstance(data, torch.utils.data.ConcatDataset):
         for subset in data.datasets:
             subset.parametrized_transform = transform
     elif isinstance(data, (list, tuple)):
         for element in data:
             element.parametrized_transform = transform
+    elif isinstance(data, torch.utils.data.Subset):
+        data.dataset.parametrized_transform = transform
     # TODO: this breaks probably when the transformed dataset hierarchy is extended
     # to the other datasets.
     elif isinstance(data, torch.utils.data.Dataset):
