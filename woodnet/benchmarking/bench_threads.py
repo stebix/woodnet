@@ -37,12 +37,13 @@ def make_smoother() -> ParametrizedTransform:
     """
     Create single, rather compute-heavy parametrized transform.
     """
-    smoother_specification = {'name' : 'GaussianSmooth', 'parameters' : {'sigma' : 3.0}}
-    smoother = generate_parametrized_transforms(smoother_specification, squeeze=False)
+    smoother_specification = {'name' : 'GaussianSmooth', 'parameters' : [{'sigma' : 3.0}]}
+    smoother = generate_parametrized_transforms(smoother_specification, squeeze=True)
     return smoother
 
 
-def make_dataset(tileshape: tuple[int, int, int],
+def make_dataset(ID_count: int,
+                 tileshape: tuple[int, int, int],
                  size: int | None) -> ConcatDataset:
     """
     Create volumetric dataset with single normalizing transform.
@@ -58,10 +59,12 @@ def make_dataset(tileshape: tuple[int, int, int],
         Use sensible numbers, basal data source are two
         wood volume cylinders.
     """
+    if ID_count < 1 or ID_count > 5:
+        raise ValueError(f'must select ID count between 1 and 5, got {ID_count}')
     transform_configurations = [{'name' : 'Normalize3D', 'mean' : 110, 'std' : 950}]
-    ID: list[str] = ['CT10', 'CT9'] 
+    ID: list[str] = ['CT10', 'CT9', 'CT20', 'CT8', 'CT12', 'CT15'] 
     builder = TransformedTileDatasetBuilder()
-    datasets = builder.build(instances_ID=ID, tileshape=tileshape,
+    datasets = builder.build(instances_ID=ID[:ID_count], tileshape=tileshape,
                              transform_configurations=transform_configurations)
     if size:
         if is_odd(size):
@@ -71,13 +74,16 @@ def make_dataset(tileshape: tuple[int, int, int],
             n_first = size // 2
             n_second = n_first
 
-        subsamples = [random.sample(range(n)) for n in (n_first, n_second)]
-        datasets = [
-            torch.utils.data.Subset(dataset, indices)
-            for dataset, indices in zip(datasets, subsamples, strict=True)
-        ]
+        subsets = []
+        for dataset, k in zip(datasets, (n_first, n_second)):
+            indices = random.sample(range(len(dataset)), k=k)
+            subset = torch.utils.data.Subset(dataset, indices)
+            subsets.append(subset)
+        
+        datasets = subsets
 
-    assert len(datasets) == 2, 'setup failure, expecting two dataset instances'
+
+    assert len(datasets) == ID_count, f'setup failure, expecting {ID_count} dataset instances'
     dataset = ConcatDataset(datasets)
     if size:
         assert len(dataset) == size, (f'faulty subset selection: total '
@@ -88,9 +94,11 @@ def make_dataset(tileshape: tuple[int, int, int],
 def make_loader(tileshape: tuple[int, int, int],
                 batch_size: int,
                 num_workers: int,
+                ID_count: int = 2,
+                size: int | None = None,
                 shuffle: bool = False) -> torch.utils.data.DataLoader:
     """Instantiate dataloader in usable state."""
-    dataset = make_dataset(tileshape)
+    dataset = make_dataset(ID_count=ID_count, tileshape=tileshape, size=size)
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                          num_workers=num_workers,
                                          shuffle=shuffle)
@@ -159,20 +167,24 @@ def run_benchmark(torch_num_threads: int,
                   device: str | torch.device,
                   size: int | None = None,
                   flavor: str = 'end2end',
+                  ID_count: int = 2,
                   dtype: torch.dtype = torch.float32) -> None:
     
     timestamp = create_timestamp()
     device = configure_benchmarking_environment(device,
                                                 torch_num_threads=torch_num_threads,
                                                 torch_interop_threads=torch_num_interop_threads)
-    location = Path(__file__)
+    location = Path(__file__).parent
     result_dir = location / 'benchresults'
-    result_dir.mkdir(exist_ok=True)
+    result_dir.mkdir(exist_ok=True, parents=True)
 
-    length = len(loader.dataset)
     model = ResNet3D(in_channels=1)
-    loader = make_loader(tileshape=tileshape, batch_size=batch_size,
-                         num_workers=num_workers)
+    model = model.to(device=device, dtype=dtype)
+    loader = make_loader(ID_count=ID_count,
+                         tileshape=tileshape, batch_size=batch_size,
+                         num_workers=num_workers, size=size)
+    
+    length = len(loader.dataset)
     parametrizations = make_smoother()
 
     if flavor == 'end2end':
@@ -198,11 +210,12 @@ def run_benchmark(torch_num_threads: int,
         'torch_num_interop_threads' : torch_num_interop_threads,
         'tileshape' : tileshape,
         'batch_size' : batch_size,
-        'device' : device,
+        'device' : str(device),
         'dset_length' : length,
         'preset_size' : size,
         'delta_t' : delta_t,
-        'average_time_per_element' : delta_t / length 
+        'average_time_per_element' : delta_t / length,
+        'ID_count' : ID_count
     }
 
     rich.print(report)

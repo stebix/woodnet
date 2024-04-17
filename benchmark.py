@@ -31,6 +31,11 @@ def create_parser() -> argparse.ArgumentParser:
                         help='Subsample this number of elements from the '
                              'benchmark dataset. Lower for lower overall benchmark time, '
                              'higher for more stable/informative results.')
+
+    parser.add_argument('--ID_count', '-c', type=int, default=2,
+                        help='Preselect the number of datasets loaded by the benchmark system. '
+                              'Smaller number guarantee faster startup but introduce '
+                              'a size/element count ceiling in the benchmark process.')
     return parser
 
 
@@ -38,6 +43,12 @@ def cli() -> argparse.Namespace:
     parser = create_parser()
     args = parser.parse_args()
     return args
+
+
+def to_int_tuple(s: str) -> tuple[int, int, int]:
+    items = s.split(',')
+    assert len(items) == 3, f'must be three comma separated values, got \'{s}\''
+    return tuple((int(item) for item in items))
 
 
 def main() -> None:
@@ -51,12 +62,13 @@ def main() -> None:
     run_benchmark(
         torch_num_threads=args.torch_num_threads,
         torch_num_interop_threads=torch_num_interop_threads,
-        tileshape=args.tileshape,
+        tileshape=to_int_tuple(args.tileshape),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         device=args.device,
         size=args.size,
-        flavor=args.flavor
+        flavor=args.flavor,
+        ID_count=args.ID_count
     )
     
 
