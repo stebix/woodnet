@@ -5,7 +5,7 @@ import warnings
 import tqdm.auto as tqdm
 
 from copy import deepcopy
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 import woodnet.logtools.dict.ops as logged 
@@ -21,6 +21,9 @@ from woodnet.logtools.infrastructure import (create_logging_infrastructure,
                                              finalize_logging_infrastructure,
                                              create_logfile_name)
 from woodnet.extent import compute_training_extent
+from woodnet.globconf import (configure_torch_cpu_threading,
+                              TORCH_NUM_THREADS, TORCH_NUM_INTEROP_THREADS)
+
 
 DataLoader = torch.utils.data.DataLoader
 
@@ -186,7 +189,8 @@ def create_trainer(configuration: dict,
     return trainer
 
 
-def run_training_experiment(configuration: dict | Path | str) -> None:
+def run_training_experiment(configuration: dict | Path | str,
+                            global_torchconf: Mapping | None = {}) -> None:
     """Run a training experiment fully defined by the configuration.
 
     The configuration may be provided as a dictionary or mapping to be directly consumed.
@@ -200,6 +204,12 @@ def run_training_experiment(configuration: dict | Path | str) -> None:
     logger, streamhandler, memoryhandler = create_logging_infrastructure(level=level)
 
     install_loginterceptor_excepthook(logger)
+
+    # configure CPU thread parallelism
+    global_torchconf = global_torchconf or {}
+    num_threads = global_torchconf.get('torch_num_threads', None) or TORCH_NUM_THREADS
+    num_interop_threads = global_torchconf.get('torch_num_interop_threads' or TORCH_NUM_INTEROP_THREADS)
+    configure_torch_cpu_threading(num_threads, num_interop_threads)
 
     if isinstance(configuration, (str, Path)):
         configuration = Path(configuration)
@@ -302,7 +312,8 @@ def actualize_configurations(configurations: Iterable[dict | Path | str]) -> lis
 
 
 
-def run_training_experiment_batch(configurations: Iterable[dict | Path | str]) -> None:
+def run_training_experiment_batch(configurations: Iterable[dict | Path | str],
+                                  global_torchconf: Mapping | None = None) -> None:
 
     levels = {
         'DEBUG' : logging.DEBUG,
@@ -319,6 +330,12 @@ def run_training_experiment_batch(configurations: Iterable[dict | Path | str]) -
                                                                          streamhandler_level=stream_log_level)
 
     install_loginterceptor_excepthook(logger)
+
+    # configure CPU thread parallelism
+    global_torchconf = global_torchconf or {}
+    num_threads = global_torchconf.get('torch_num_threads', None) or TORCH_NUM_THREADS
+    num_interop_threads = global_torchconf.get('torch_num_interop_threads' or TORCH_NUM_INTEROP_THREADS)
+    configure_torch_cpu_threading(num_threads, num_interop_threads)
 
     configurations = actualize_configurations(configurations)
     precheck_configuration_batch(configurations)
