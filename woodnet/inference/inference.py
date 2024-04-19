@@ -203,4 +203,4 @@ def run_prediction_evaluation(basedir: Path,
     Run full evaluation for a CV-fold training result.
     """
     cv_results_bag = CrossValidationResultsBag.from_directory(basedir)
-    inference_directory = create_inference_directory()
+    inference_directory = create_inference_directory(basedir)
