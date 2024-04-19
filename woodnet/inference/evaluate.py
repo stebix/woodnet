@@ -340,3 +340,93 @@ def evaluate_folds(foldspecs: dict[int, FoldSpec],
         result['folds'][foldnum] = result
 
     return results
+
+
+
+
+from woodnet.inference.directories import TrainingResultBag
+from woodnet.inference.inference import (extract_IDs, extract_model_config,
+                                         transmogrify_state_dict,
+                                         deduce_loader_from_training)
+from woodnet.inference.utils import parse_checkpoint_fname
+
+from woodnet.models import get_model_class
+
+
+def inject_state_dict(model: torch.nn.Module, state_dict: Mapping) -> None:
+    try:
+        model.load_state_dict(state_dict)
+    except RuntimeError:
+        logger.warning('Direct state dict loading failed with runtime error. Re-attempting '
+                       'with transmogrified state dict.')
+    
+        state_dict = transmogrify_state_dict(state_dict)
+        model.load_state_dict(state_dict)
+    logger.info('Successfully loaded state dictionary.')
+
+
+def make_foldspecs_from(training_results_bag: TrainingResultBag,
+                        batch_size: int,
+                        num_workers: int,
+                        pin_memory: bool) -> list[FoldSpec]:
+    """
+    Produce the `FoldSpec` instances from the training results bag.
+
+    Parameters
+    ----------
+
+    training_results_bag : TrainingResultsBag
+        Compound data structure of training results.
+
+    batch_size : int
+        Batch size set on newly constructed data loader.
+
+    num_workers : int
+        Worker process count for data loading purposes.
+
+    pin_memory : bool
+        Flag to set memory pinning behaviour.
+    """
+    configuration = training_results_bag.load_configuration()
+
+    # deduce model template/class from the training configuration
+    model_conf, compile_conf = extract_model_config(configuration)
+    model_class = get_model_class(model_conf)
+
+    models: dict[str, torch.nn.Module] = {}
+
+    for chkpt_path in training_results_bag.checkpoints:
+        model = model_class(**model_conf)
+        logger.info(f'Successfully created unique {model_class} instance')
+        state_dict = torch.load(chkpt_path)
+        logger.info(f'Successfully loaded checkpoint state dict from location \'{chkpt_path}\'.')
+        inject_state_dict(model, state_dict)
+
+        # construct model ID string: $qualifier_$UUID  or $UUID depdening on qualifier value
+        parts = parse_checkpoint_fname(chkpt_path.name)
+        identifier = '_'.join((parts.qualifier, parts.UUOD)) if parts.qualifier else parts.UUID
+        models[identifier] = model
+
+    loader = deduce_loader_from_training(configuration, batch_size=batch_size,
+                                         num_workers=num_workers, pin_memory=pin_memory)
+
+    foldspec = FoldSpec(models, loader)
+    return foldspec
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
