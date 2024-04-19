@@ -137,7 +137,7 @@ class TrainingResultBag:
         Load the configuration YAML file from the log directory.
         """
         yaml = YAML()
-        with self.logfile.open(mode='r') as handle:
+        with self.training_configuration.open(mode='r') as handle:
             configuration = yaml.load(handle)
         return configuration
             
