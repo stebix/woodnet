@@ -6,6 +6,7 @@ Facilities to programmatically interact with training directories for inference 
 import logging
 import dataclasses
 
+from functools import cached_property
 from collections.abc import Sequence, Iterable, Mapping
 from pathlib import Path
 
@@ -114,7 +115,7 @@ def get_fold_directories(basepath: Path, sort: bool = True) -> dict[int, Path]:
         directories = {k : directories[k] for k in sorted(directories.keys())}
     return directories
 
-
+from woodnet.inference.utils import RegisteredCheckpointFilepath, EpochIntervalCheckpointFilepath, parse_checkpoint
 
 @dataclasses.dataclass
 class TrainingResultBag:
@@ -131,8 +132,41 @@ class TrainingResultBag:
     logfile: Path
     training_configuration: Path
     tensorboard_file: Path
+    registered_checkpoints: list[RegisteredCheckpointFilepath] = dataclasses.field(init=False)
+    interval_checkpoints:  list[EpochIntervalCheckpointFilepath] = dataclasses.field(init=False)
+    improper_checkpoint_candidates: list[Path] = dataclasses.field(init=False)
+    _configuration: dict | None = dataclasses.field(init=False, default=None)
 
-    def load_configuration(self) -> dict:
+    def __post_init__(self) -> None:
+        # init the fields since initializer does not perform this work
+        self.registered_checkpoints = []
+        self.interval_checkpoints = []
+        self.improper_checkpoint_candidates = []
+        # parse and sort into fiting categories
+        for chkpt_path in self.checkpoints:
+            try:
+                parsed_fpath = parse_checkpoint(chkpt_path)
+            except ValueError:
+                self.improper_checkpoint_candidates.append(chkpt_path)
+            if isinstance(parsed_fpath, RegisteredCheckpointFilepath):
+                self.registered_checkpoints.append(parsed_fpath)
+            elif isinstance(parsed_fpath, EpochIntervalCheckpointFilepath):
+                self.interval_checkpoints.append(parsed_fpath)
+            else:
+                raise RuntimeError(f'What the heck is this: \'{parsed_fpath}\'')
+
+
+    def fetch_configuration(self) -> dict:
+        """
+        Get the training configuration of the training results.
+        Uses caching to minimize I/O overhead.
+        """
+        if self._configuration is None:
+            self._configuration = self._load_configuration()
+        return self._configuration
+
+
+    def _load_configuration(self) -> dict:
         """
         Load the configuration YAML file from the log directory.
         """
