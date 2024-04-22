@@ -2,7 +2,7 @@ import importlib
 import torch
 import logging
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Type
 
@@ -27,23 +27,56 @@ def get_model_class(configuration: dict) -> Type[torch.nn.Module]:
 
 
 
-def create_model(configuration: dict) -> Callable:
+def create_model(configuration: Mapping,
+                 no_compile_override: bool = False) -> Callable:
     """
     Create raw model object from top-level configuration.
+
+    Parameters
+    ----------
+
+    configuration : Mapping
+        Top-level configuration. Must at least define a
+        model subsection.
+
+    no_compile_override : bool, optional
+        Optional switch to fully disable compilation. Overrides
+        any compilation options defined by the configuration mapping.
+        Defaults to 'False', i.e. usage of the configuration options.
+
+    
+    Returns
+    -------
+
+    model : Callable (torch.nn.Module or OptimizedModule)
+        Model instance. May be optmized/compiled
+        depending on settings.
     """
     configuration =  deepcopy(configuration)
     model_configuration = configuration.pop('model')
     model_class = get_model_class(model_configuration)
     # determine compilation settings by user
     compile_configuration = model_configuration.pop('compile', {})
-    compile_flag = compile_configuration.pop('enabled', False)
+    config_compile_flag = compile_configuration.pop('enabled', False)
 
-    model = model_class(**model_configuration) 
+    model = model_class(**model_configuration)
 
-    if not compile_configuration or not compile_flag:
-        logger.debug('Successfully created eager model object')
+    # This is the never compile branch
+    if no_compile_override:
+        if not config_compile_flag or not compile_configuration:
+            message = f'Successfully created eager model object of {model_class}'
+        if config_compile_flag:
+            message = (f'Configuration-requested compilation is disabled via override flag. '
+                       f'Successfully created eager model object of {model_class}')
+        logger.info(message)
         return model
-    else:
+
+    if config_compile_flag:
         model = torch.compile(model, **compile_configuration)
-        logger.debug(f'Successfully compiled model object with options: {compile_configuration}')
+        logger.info(f'Successfully created model object of {model_class} and '
+                    f'compiled with options: {compile_configuration}')
         return model
+    
+    # basal fallthrough case: eager model is returned
+    logger.info(f'Successfully created eager model object of {model_class}')
+    return model
