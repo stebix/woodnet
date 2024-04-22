@@ -276,7 +276,36 @@ class Test_evaluate_multiple:
         gibbs_parametrizations = CongruentTransformList(noise_transforms)
         transforms = [gauss_parametrizations, gibbs_parametrizations]
 
-        results = evaluate_multiple(models_mapping=models_mapping,
+        results = evaluate_multiple(models=models_mapping,
+                                    loader=loader,
+                                    transforms=transforms,
+                                    device=device, dtype=dtype, use_amp=use_amp,
+                                    use_inference_mode=use_inference_mode,
+                                    display_model_instance_progress=True,
+                                    leave_model_instance_progress=True,
+                                    display_transforms_progress=True,
+                                    display_parametrizations_progress=True,
+                                    display_loader_progress=True)
+        rich.print(results)
+
+
+    @pytest.mark.slow
+    def test_smoke_compiled_model(self, smooth_transforms, noise_transforms, test_loader):
+        """Basal test that the function runs for a correct setup where the model is compiled."""
+        device = torch.device('cuda:0')
+        dtype = torch.float32
+        use_amp = True
+        use_inference_mode = True
+        loader = test_loader
+        models_mapping = {
+            f'mock_checkpoint-{i}' : torch.compile(ResNet3D(in_channels=1), fullgraph=False, dynamic=False)
+            for i in range(2)
+        }
+        gauss_parametrizations = CongruentTransformList(smooth_transforms)
+        gibbs_parametrizations = CongruentTransformList(noise_transforms)
+        transforms = [gauss_parametrizations, gibbs_parametrizations]
+
+        results = evaluate_multiple(models=models_mapping,
                                     loader=loader,
                                     transforms=transforms,
                                     device=device, dtype=dtype, use_amp=use_amp,
@@ -288,6 +317,7 @@ class Test_evaluate_multiple:
                                     display_loader_progress=True)
 
         rich.print(results)
+
 
 
 
