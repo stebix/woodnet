@@ -1,7 +1,10 @@
 import argparse
 
-from woodnet.train import run_training_experiment, run_training_experiment_batch
+from woodnet.evaluate import run_evaluation_experiment
+from woodnet.parsing import cli
 from woodnet.predict import run_prediction_experiment
+from woodnet.train import run_training_experiment, run_training_experiment_batch
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Main entrypoint to perform training '
@@ -28,16 +31,11 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cli() -> argparse.Namespace:
-    parser = create_parser()
-    args = parser.parse_args()
-    return args
 
-
-def main() -> None:
-    args = cli()
-
-    # if only the first option `torch_num_threads` is set, use this count globally
+def create_global_torchconf(args: argparse.Namespace) -> dict:
+    """Create the thread-specific global PyTorch configuration from the CLI namespace."""
+    # if only the first option `torch_num_threads` is set, use this count for the
+    # second `torch_num_interop_threads` as well 
     if args.torch_num_threads is not None and args.torch_num_interop_threads is None:
         torch_num_threads = args.torch_num_threads
         torch_num_interop_threads = torch_num_threads
@@ -47,24 +45,49 @@ def main() -> None:
 
     global_torchconf = {'torch_num_threads' : torch_num_threads,
                         'torch_num_interop_threads' : torch_num_interop_threads}
+    return global_torchconf
 
-    if args.task == 'train':
-        if len(args.configuration) != 1:
-            raise RuntimeError('train verb requires singular configuration specification')
-        run_training_experiment(args.configuration[0], global_torchconf=global_torchconf)
-    elif args.task == 'batchtrain':
-        # TODO: maybe more clean if we include subparser for multiple number of arguments
-        run_training_experiment_batch(args.configuration,
+
+def main() -> None:
+    """Main woodnet package CLI entrypoint."""
+    args = cli()
+    global_torchconf = create_global_torchconf(args)
+
+    if args.task_verb == 'train':
+        run_training_experiment(args.configuration, global_torchconf=global_torchconf)
+
+    elif args.task_verb == 'batchtrain':
+        run_training_experiment_batch(args.configurations,
                                       global_torchconf=global_torchconf)
-    elif args.task == 'predict':
+
+    elif args.task_verb == 'evaluate':
+        use_amp = not args.no_amp
+        use_inference_mode = not args.use_no_grad
+        non_blocking_transfer = not args.blocking_transfer
+        no_compile_override = True if args.compilation == 'never' else False
+        run_evaluation_experiment(basedir=args.basedir,
+                                  transforms_preset=args.transforms,
+                                  batch_size=args.batchsize,
+                                  device=args.device,
+                                  dtype=args.dtype,
+                                  use_amp=use_amp,
+                                  use_inference_mode=use_inference_mode,
+                                  non_blocking_transfer=non_blocking_transfer,
+                                  num_workers=args.num_workers,
+                                  shuffle=False,
+                                  pin_memory=args.pin_memory,
+                                  no_compile_override=no_compile_override,
+                                  inject_early_to_device=args.inject_early_to_device,
+                                  global_torchconf=global_torchconf
+                                  )
+
+    elif args.task_verb == 'predict':
         run_prediction_experiment(args.configuration,
                                   global_torchconf=global_torchconf)
         
     else:
         raise RuntimeError(f'invalid task action \'{args.task}\'')
     
-
-
 
 if __name__ == '__main__':
     main()
