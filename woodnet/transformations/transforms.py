@@ -21,7 +21,38 @@ DEFAULT_SEED = int(time.time())
 logger.info(f'Using time based RNG seed {DEFAULT_SEED}')
 
 
-class Normalize3D:
+class Identity:
+    def __init__(self):
+        pass
+
+    def __call__(self, x: Tensor) -> Tensor:
+        return x
+    
+    def __str__(self) -> str:
+        return f'Identity()'
+
+
+class ToDevice:
+    """Eagerly move incoming tensors to the indicated device."""
+    def __init__(self,
+                 device: torch.device,
+                 non_blocking: bool = True) -> None:
+        self.device = device
+        self.non_blocking = non_blocking
+    
+    def __call__(self, x: Tensor) -> Tensor:
+        x = x.to(device=self.device, non_blocking=self.non_blocking)
+        return x
+    
+    def __str__(self) -> str:
+        return f'ToDevice(device=\'{self.device}\', non_blocking={self.non_blocking})'
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+
+
+class Normalize:
     """
     Transform (volume) histogram to zero mean and unit standard
     deviation parameters.
@@ -40,6 +71,14 @@ class Normalize3D:
     
     def __repr__(self) -> str:
         return str(self)
+
+
+
+def Normalize3D(mean: float, std: float):
+    logger.warning('Usage of class \'Normalize3D\' is deprecated. Use '
+                   '\'Normalize\' instead.')
+    return Normalize(mean=mean, std=std)
+
 
 
 class Rotate90:

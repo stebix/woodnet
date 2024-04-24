@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.utils.data as torchdata
 import zarr
+import tqdm.auto as tqdm
 
 from pathlib import Path
 from functools import partial, cached_property
@@ -17,9 +18,10 @@ from collections.abc import Callable, Sequence, Iterable
 from typing import Literal
 from torch import Tensor
 
-from woodnet.datasets import CLASSNAME_REMAP
+from woodnet.datasets.constants import CLASSNAME_REMAP
 from woodnet.datasets.tiling import TileBuilder
 from woodnet.custom.types import PathLike
+from woodnet.inference.parametrized_transforms import ParametrizedTransform
 
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
@@ -320,3 +322,67 @@ class TriaxialDataset(torchdata.Dataset):
 
     def __repr__(self) -> str:
         return str(self)
+
+
+from woodnet.datasets.constants import DEFAULT_CLASSLABEL_MAPPING
+from woodnet.transformations.transformer import Transformer
+from woodnet.transformations.buildtools import from_configurations
+
+
+
+
+class TriaxialDatasetBuilder:
+    """
+    Build a 3D TileDataset programmatically.
+
+    Thin class, basically acts as a namespace. Maybe move to module?
+    """
+    internal_path: str = 'downsampled/half'
+    classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
+    # TODO: factor hardcoded paths out -> bad!
+    base_directory: Path = Path('/home/jannik/storage/wood/custom/')
+    pretty_phase_name_map = {'val' : 'validation', 'train' : 'training', 'test' : 'testing'}
+
+    def build(cls,
+              instances_ID: Iterable[str],
+              phase: Literal['train', 'val', 'test'],
+              tileshape: TileShape,
+              planestride: tuple[int, int, int],
+              transform_configurations: Iterable[dict] | None = None,
+              **kwargs
+              ) -> list[TriaxialDataset]:
+        
+        datasets = []
+        if transform_configurations:
+            transformer = Transformer(
+                *from_configurations(transform_configurations)
+            )
+        else:
+            transformer = None
+
+        phase_name = cls.pretty_phase_name_map.get(phase, phase)
+        desc = f'{phase_name} dataset build progress'
+        wrapped_IDs = tqdm.tqdm(instances_ID, unit='dataset', desc=desc, leave=False)
+        for ID in wrapped_IDs:
+            wrapped_IDs.set_postfix_str(f'current_ID=\'{ID}\'')
+            path = cls.get_path(ID)        
+            dataset = TriaxialDataset(
+                path=path, phase=phase,
+                planestride=planestride,
+                tileshape=tileshape,
+                transformer=transformer,
+                classlabel_mapping=cls.classlabel_mapping,
+                internal_path=cls.internal_path,
+                **kwargs
+            )
+            datasets.append(dataset)
+        return datasets
+
+
+    @classmethod
+    def get_path(cls, ID: str) -> Path:
+        for child in cls.base_directory.iterdir():
+            if child.match(f'*/{ID}*'):
+                return child
+        raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
+                                f'basedir "{cls.base_directory}"')

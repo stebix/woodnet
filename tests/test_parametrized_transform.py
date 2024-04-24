@@ -1,10 +1,27 @@
+import torch
 import pytest
 
 from woodnet.inference.parametrized_transforms import (get_transform_class,
                                                        ParametrizedTransform,
-                                                       extract_class_name_with_namespace,
                                                        generate_parametrized_transforms,
                                                        CongruentTransformList)
+
+
+
+class Test_ParametrizedTransform:
+
+    def test_create_and_has_raw_data_passthrough(self):
+        x = torch.randn((1, 8, 8, 8))
+        identity_ptf = ParametrizedTransform.make_identity()
+        out = identity_ptf.transform(x)
+        assert torch.allclose(x, out)
+
+    def test_name_is_set(self):
+        external_name = 'no_change'
+        identity_ptf = ParametrizedTransform.make_identity(name=external_name)
+        assert identity_ptf.name == external_name
+        
+
 
 
 class Test_get_transform_class:

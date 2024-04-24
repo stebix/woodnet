@@ -61,7 +61,7 @@ def create_loss(configuration: dict) -> torch.nn.Module:
     return loss_class(**lossconf)
 
 
-def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader]:
+def create_loaders_LEGACY(configuration: dict) -> dict[str, torch.utils.data.DataLoader]:
     """
     Create training and validation data loader from top-level config.
     """
@@ -87,6 +87,47 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
         phase_config = dataset_config.get(phase)
         phase_config.update({'tileshape' : tileshape, 'phase' : phase})
         datasets = builder.build(**phase_config)
+        dataset = torch.utils.data.ConcatDataset(datasets)
+        shuffle = True if phase == 'train' else False
+
+        loader = torch.utils.data.DataLoader(
+            dataset, batch_size=batchsize, num_workers=num_workers,
+            shuffle=shuffle, pin_memory=pin_memory
+        )
+        loaders[phase] = loader
+
+    return loaders
+
+
+from woodnet.datasets import get_builder_class
+
+def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader]:
+    """
+    Create training and validation data loader from top-level config.
+    Without fixation on TileDataset
+    """
+    if 'loaders' not in configuration:
+        raise ConfigurationError('missing required loaders subconfiguration')
+
+    loaders_config = deepcopy(configuration['loaders'])
+    # differentiate subconfigurations and mutate
+    # residual key - value pairs must be valid for dataset builder build method
+    phase_configs = {phase : loaders_config.pop(phase) for phase in ('train', 'val')}
+    name = loaders_config.pop('dataset')
+    # torch data loader settings
+    num_workers = logged.pop(loaders_config, key='num_workers', default=1)
+    pin_memory = logged.pop(loaders_config, key='pin_memory', default=False)
+    batchsize = logged.pop(loaders_config, key='batchsize', default=1)
+
+    # residual key-value pairs must be admissible for builder.build method
+    residual_kwargs = loaders_config
+
+    builder = get_builder_class(name)()
+    
+    loaders = {}
+    for phase, conf in phase_configs.items():
+        conf |= residual_kwargs | {'phase' : phase}
+        datasets = builder.build(**conf)
         dataset = torch.utils.data.ConcatDataset(datasets)
         shuffle = True if phase == 'train' else False
 

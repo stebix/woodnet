@@ -6,7 +6,7 @@ import torch
 import pytest
 
 from woodnet.models import create_model
-from woodnet.inference.evaluate import LazyModelDict
+from woodnet.inference.resurrection import LazyModelDict
 
 
 # number of strID to model path relations contained in the

@@ -1,16 +1,17 @@
 import torch
 import pytest
 import rich
+from pathlib import Path
 
 from ruamel.yaml import YAML
 
-
-from woodnet.datasets.volumetric_inference import (TransformedTileDatasetBuilder,
-                                                   TransformedTileDataset)
+from woodnet.datasets.volumetric import (TileDataset,
+                                         TileDatasetBuilder)
 
 from woodnet.inference.evaluate import evaluate, evaluate_multiple, Predictor
 from woodnet.inference.inference import (create_parametrized_transforms,
-                                         extract_IDs, extract_model_config)
+                                         extract_IDs, extract_model_config,
+                                         increment_filename)
 
 from woodnet.models.volumetric import ResNet3D
 from woodnet.inference.parametrized_transforms import (CongruentTransformList,
@@ -182,11 +183,12 @@ def noise_transforms() -> list[ParametrizedTransform]:
 
 
 @pytest.fixture(scope='function')
-def datasets() -> list[TransformedTileDataset]:
+def datasets() -> list[TileDataset]:
     N: int = 2
     ID: list[str] = ['CT10', 'CT9'] 
-    builder = TransformedTileDatasetBuilder()
-    datasets = builder.build(instances_ID=ID, tileshape=(64, 64, 64), transform_configurations=None)
+    builder = TileDatasetBuilder()
+    datasets = builder.build(instances_ID=ID, phase='val', tileshape=(64, 64, 64),
+                             transform_configurations=[{'name' : 'Identity'}])
     assert len(datasets) == N
     return datasets
 
@@ -212,7 +214,7 @@ class Test_evaluate:
         model.to(device=device, dtype=dtype)
         # just select one dataset for performance reasons
         dataset = datasets[0]
-        assert isinstance(dataset, TransformedTileDataset), 'required for test setup'
+        assert isinstance(dataset, TileDataset), 'required for test setup'
         # construct cheap data loader
         batch_size: int = 64
         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
@@ -375,3 +377,25 @@ class Test_extract_model_config:
         modelconf, compileconf = extract_model_config(configuration)
         assert modelconf == {'name': 'ResNet3D', 'in_channels': 1}
         assert compileconf == {'enabled' : True, 'dynamic' : False, 'fullgraph' : False}
+
+
+class Test_increment_filename:
+    def test_with_newly_introduced_numbering(self):
+        path = Path('/home/mydir/thisfileexists.json')
+        result = increment_filename(path)
+        expected = path.parent / 'thisfileexists-1.json'
+        assert result == expected
+
+    @pytest.mark.parametrize('n', (1, 7, 100, 1701))
+    def test_with_preexisting_numbering(self, n):
+        path = Path(f'/home/mydir/thisfileexists-{n}.json')
+        result = increment_filename(path)
+        m = n + 1
+        expected = path.parent / f'thisfileexists-{m}.json'
+        assert result == expected
+
+    def test_with_wierd_dash_pattern(self):
+        path = Path('/home/mydir/thisfileexists-andhasminus-many.json')
+        result = increment_filename(path)
+        expected = path.parent / 'thisfileexists-andhasminus-many-1.json'
+        assert result == expected

@@ -25,22 +25,38 @@ instances/checkpoints are expected to be bundled together.
 import logging
 import dataclasses
 import contextlib
+from collections import defaultdict
 from collections.abc import Mapping, Sequence, Callable
 from pathlib import Path
+from typing import NamedTuple
 
 import torch
 import torch.utils
 import tqdm.auto as tqdm
+from frozendict import frozendict
 
 from woodnet.datasets.volumetric_inference import set_parametrized_transform
 from woodnet.evaluation.metrics import compute_cardinalities
-from woodnet.inference.inference import get_transforms_name
 from woodnet.inference.parametrized_transforms import CongruentParametrizations, ParametrizedTransform
 from woodnet.trackers import TrackedCardinalities
+from woodnet.inference.directories import TrainingResultBag, CrossValidationResultsBag
+from woodnet.configtools.validation import TrainingConfiguration
+from woodnet.inference.resurrection import resurrect_models_from
+from woodnet.transformations.transforms import ToDevice
 
+ContextManager = contextlib.AbstractContextManager
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def get_transforms_name(transforms) -> str:
+    """Try to get/deduce the global semantical name of the transforms."""
+    try:
+        name = transforms.name
+    except AttributeError:
+        name = 'parametrized transforms'
+    return name
 
 
 def evaluate(model: torch.nn.Module,
@@ -68,7 +84,7 @@ def evaluate(model: torch.nn.Module,
         tracker.reset()
         # set variable transform to current parametrized instance
         set_parametrized_transform(loader.dataset, transform=parametrization)
-        wrapped_loader = maybe_wrap_loader(loader, display_loader_progress)
+        wrapped_loader = maybe_wrap_loader(display_loader_progress, loader, False)
 
         # improved progress reporting
         if display_parametrizations_progress:
@@ -113,17 +129,17 @@ class Predictor:
         self.leave_transforms_progress = leave_transforms_progress
 
 
-    def disabled_gradient_context(self):
+    def disabled_gradient_context(self) -> ContextManager:
         if self.use_inference_mode:
             return torch.inference_mode()
         return torch.no_grad()
 
 
-    def amp_context(self):
+    def amp_context(self) -> ContextManager:
         return torch.autocast(device_type=self.device.type, enabled=self.use_amp)
 
 
-    def inference_contexts(self) -> tuple:
+    def inference_contexts(self) -> tuple[ContextManager, ContextManager]:
         """Get configured no-gradient and mixed precision contexts."""
         return (self.disabled_gradient_context(), self.amp_context())
 
@@ -174,9 +190,6 @@ class Predictor:
                 report.append(parametrization_report)
 
         return report
-
-
-from typing import NamedTuple
 
 
 class TaggedDataElement(NamedTuple):
@@ -187,102 +200,6 @@ class TaggedDataElement(NamedTuple):
     data: torch.Tensor
     label: torch.Tensor
     tag: dict
-
-
-
-class AdvancedPredictor:
-    eager_configure_model: bool = True
-
-    def __init__(self,
-                 ID: str,
-                 model: torch.nn.Module,
-                 device: str | torch.device,
-                 dtype: torch.dtype,
-                 use_amp: bool,
-                 use_inference_mode: bool,
-                 display_transforms_progress: bool,
-                 display_parametrizations_progress: bool,
-                 display_loader_progress: bool,
-                 leave_transforms_progress: bool = True
-                 ) -> None:
-
-        self.ID = ID
-        self.model = model
-        self.device = torch.device(device) if isinstance(device, str) else device
-        self.dtype = dtype
-        self.use_amp = use_amp
-        self.use_inference_mode = use_inference_mode
-        self.display_transforms_progress = display_transforms_progress
-        self.display_parametrizations_progress = display_parametrizations_progress
-        self.display_loader_progress = display_loader_progress
-        self.leave_transforms_progress = leave_transforms_progress
-
-        if self.eager_configure_model:
-            self.configure_model()
-
-
-    def disabled_gradient_context(self):
-        if self.use_inference_mode:
-            return torch.inference_mode()
-        return torch.no_grad()
-
-
-    def amp_context(self):
-        return torch.autocast(device_type=self.device.type, enabled=self.use_amp)
-
-
-    def inference_contexts(self) -> tuple:
-        """Get configured no-gradient and mixed precision contexts."""
-        return (self.disabled_gradient_context(), self.amp_context())
-
-
-    def configure_model(self) -> None:
-        """Jointly adjust model float precision, eval mode and testing flag."""
-        self.model.eval()
-        logger.debug('Set model to evaluation mode.')
-        self.model.testing = True
-        final_nonlinearity = getattr(self.model, 'final_nonlinearity', None)
-        logger.debug(
-            f'Set model testing flag. Final nonlinearity is: {final_nonlinearity}'
-        )
-        self.model.to(dtype=self.dtype, device=self.device)
-        logger.debug(f'Moved model to precision {self.dtype} and device {self.device}')
-
-
-    def predict(self,
-                loader: torch.utils.data.DataLoader,
-                transforms: Sequence[CongruentParametrizations]) -> dict:
-        """
-        Perform full prediction run (full loader) for a number of parmetrizations
-
-        Results are reported as a metadata-enhanced dictionary with
-        """
-        report = []
-        self.configure_model()
-
-        if self.display_transforms_progress:
-            settings = {'desc' : 'transformations', 'unit' : 'tf',
-                        'leave' : self.leave_transforms_progress}
-            transforms = tqdm.tqdm(transforms, **settings)
-
-        with contextlib.ExitStack() as stack:
-            # conditionally use amp and inference or no-grad mode for speed/throughput
-            [stack.enter_context(cm) for cm in self.inference_contexts()]
-            for parametrizations in transforms:
-                if self.display_transforms_progress:
-                    transforms.set_postfix_str(f'transform=\'{parametrizations.name}\'')
-
-                result = evaluate(self.model,
-                                  loader=loader, parametrizations=parametrizations,
-                                  device=self.device, dtype=self.dtype,
-                                  display_parametrizations_progress=self.display_transforms_progress,
-                                  display_loader_progress=self.display_loader_progress)
-
-                parametrization_report = {'metadata' : parametrizations.info(), 'report' : result}
-                report.append(parametrization_report)
-
-        return report
-    
 
 
 def evaluate_multiple(models: Mapping[str, torch.nn.Module],
@@ -385,9 +302,6 @@ def check_unique_names(transforms: Sequence[CongruentParametrizations]) -> bool:
     names = {transform.name for transform in transforms}
     return len(names) == len(transforms)
 
-from frozendict import frozendict
-
-
 
 def maybe_wrap_transforms(do_wrap: bool,
                           transforms: Sequence[CongruentParametrizations],
@@ -434,7 +348,8 @@ def maybe_wrap_models(do_wrap: bool,
     return tqdm.tqdm(models, **settings)
 
 
-def get_inference_contexts(use_inference_mode: bool, use_amp: bool, device: torch.device):
+def get_inference_contexts(use_inference_mode: bool, use_amp: bool,
+                           device: torch.device) -> list[ContextManager]:
     contexts = []
     if use_inference_mode:
         contexts.append(torch.inference_mode())
@@ -442,9 +357,6 @@ def get_inference_contexts(use_inference_mode: bool, use_amp: bool, device: torc
         contexts.append(torch.no_grad())
     contexts.append(torch.autocast(device_type=device.type, enabled=use_amp))
     return contexts
-
-
-from collections import defaultdict
 
 
 def prebuild_results_mapping(model_identifiers: Sequence[str],
@@ -461,15 +373,17 @@ def prebuild_results_mapping(model_identifiers: Sequence[str],
     return container
 
 
-def recursive_to_statedict(d: Mapping) -> dict:
+def recursive_value_to_statedict(d: Mapping) -> dict:
     """
-    Recursively transform `TrackedCardinality` instances at any depth of the
-    nested instance into their corresponding `state_dict`.
+    Recursively transforms `TrackedCardinality` instances selectively
+    (only Mapping values) at any depth of the (possibly nested)
+    mapping into their corresponding state dictionary via
+    the corresponding method. 
     """
     transformed = {}
     for k, v in d.items():
         if isinstance(v, dict):
-            transformed[k] = recursive_to_statedict(v)
+            transformed[k] = recursive_value_to_statedict(v)
         elif isinstance(v, TrackedCardinalities):
             transformed[k] = v.state_dict()
         else:
@@ -477,27 +391,37 @@ def recursive_to_statedict(d: Mapping) -> dict:
     return transformed
 
 
-def configure_model(model: torch.nn.Module,
-                    dtype: torch.dtype,
-                    device: torch.device,
-                    eval_mode: bool,
-                    testing_flag: bool) -> torch.nn.Module:
-    """Configure model according to settings."""
-    model = model.to(dtype=dtype, device=device)
-    if eval_mode:
-        model.eval()
-    if testing_flag:
-        model.testing = True
-    return model
+def recursive_key_to_string(d: Mapping) -> dict:
+    """
+    Recursively transform `frozendict` instances selectively 
+    (only Mapping keys) at any depth of the
+    (possibly nested) mapping into their corresponding 
+    string representation. 
+    """
+    transformed = {}
+    for k, v in d.items():
+        if isinstance(k, frozendict):
+            k = str(k)
+        if isinstance(v, dict):
+            transformed[k] = recursive_key_to_string(v)
+        else:
+            transformed[k] = v
+    return transformed
 
 
 class NullProgressBar:
-
+    """Minimal stand-in for tqdm progress bar object."""
     def update(self):
         pass
 
     def reset(self):
         pass
+
+    def close(self):
+        pass
+
+    def __str__(self) -> str:
+        return 'NullProgressBar()'
 
 
 def evaluate_multiple_inverted(models: Mapping[str, Callable],
@@ -529,8 +453,9 @@ def evaluate_multiple_inverted(models: Mapping[str, Callable],
     """
     if not check_unique_names(transforms):
         logger.warning('Detected parametrized transforms with non-unique names. '
-                       'This will overwrite-reduce computed result metrics.')
-
+                       'This is probably unwanted and will overwrite some '
+                       'computed result metrics.')
+        
     container = prebuild_results_mapping(models.keys(), transforms)
     transforms = maybe_wrap_transforms(do_wrap=display_loader_progress, transforms=transforms,
                                        leave=leave_transforms_progress)    
@@ -585,96 +510,12 @@ def evaluate_multiple_inverted(models: Mapping[str, Callable],
                     parameters = frozendict(parametrization.parameters)
                     tracker = container[ID][name]['results'][parameters]
                     tracker.update(cardinalities)
-                    models_pbar.update()
-                
+                    models_pbar.update()   
                 models_pbar.reset()
 
+    models_pbar.close()
     return container
 
-
-
-
-from collections import UserDict
-
-class LazyModelDict(UserDict):
-    """
-    Dict-like container that instantiates models lazily upon request via key.
-    
-    The model is prouced from the basic ingredients.
-
-    Basic ingredients:
-        - Mapping from unique model string ID to checkpoint file location.
-        - (top-level) configuration containing the model specification
-          e.g. name, kwargs and fully optional compile options
-    
-    Model object will be newly created from ground up upon value retrieval.
-    """
-    # Configuration is required but kwarg, maybe design this better.
-    def __init__(self, dict=None, /, configuration: Mapping = None, no_compile_override: bool = False) -> None:
-        if configuration is None:
-            raise TypeError('LazyModelDict requires configuration')
-        self._configuration = configuration
-        self.no_compile_override = no_compile_override
-        super().__init__(dict)
-    
-
-    def __setitem__(self, key: str, item: Path) -> None:
-        if not isinstance(item, Path):
-            logger.warning(f'LazyModelDict expects pathlib.Path values, but got {type(item)}')
-        try:
-            suffix = item.suffix
-        except AttributeError:
-            suffix = 'NOTSET'
-        
-        if not suffix.endswith('pth'):
-            logger.warning('Inserted value does have expected \'pth\' suffix.')
-
-        return super().__setitem__(key, item)
-    
-
-    def __getitem__(self, key: str) -> Callable | torch.nn.Module:
-        """
-        Retrieve model item via string ID key.
-        Model will be lazily instantiated on the fly.
-
-        NOTE: Currently we create the randomly-init'ed model, compile it and then
-              load the trained parameters via the state_dict.
-              This may have unforeseen performance consequences. Check this!
-        """
-        path = super().__getitem__(key)
-        logger.debug(f'Requested model instance (ID=\'{key}\') from location \'{path}\'')
-        model = create_model(self._configuration, no_compile_override=self.no_compile_override)
-        # first force load to CPU/RAM: training and inference device may differ
-        state_dict = torch.load(path, map_location='cpu')
-        inject_state_dict(model, state_dict)
-        logger.debug(f'Successfully re-created model from location: \'{path}\'.')
-        return model
-        
-
-def create_models_from(pathmap: Mapping[str, Path],
-                       configuration: Mapping,
-                       dtype: torch.dtype,
-                       device: torch.device,
-                       no_compile_override: bool = False,
-                       eval_mode: bool = True,
-                       testing_flag: bool = True
-                       ) -> dict[str, Callable | torch.nn.Module]:
-    """
-    Eagerly resurrect models mapping from a path mapping.
-    """
-    models = {}
-    for ID, path in pathmap.items():
-        logger.debug(f'Starting creation of model instance (ID=\'{ID}\''
-                     f') from location \'{path}\'')
-        model = create_model(configuration, no_compile_override=no_compile_override)
-        state_dict = torch.load(path, map_location='cpu')
-        inject_state_dict(model, state_dict)
-        model = configure_model(model, dtype=dtype, device=device, eval_mode=eval_mode,
-                                testing_flag=testing_flag)
-        logger.debug(f'Successfully re-created and configured model.')
-        models[ID] = model
-    return models
-        
 
 
 @dataclasses.dataclass
@@ -699,7 +540,7 @@ class DatasetRecipe:
 
     kwargs : Mapping
         Any further kwargs necessary for dataset creation.
-        Usual choices are e.g. 'tileshape' for volumetric datasets or
+        Usual options are e.g. 'tileshape' for volumetric datasets or
         'axis' for planar datasets.
     """
     IDs: Sequence[str]
@@ -708,11 +549,10 @@ class DatasetRecipe:
     kwargs: dict
 
 
-from woodnet.configtools.validation import TrainingConfiguration
 
 def deduce_dataset_recipe(configuration: Mapping) -> DatasetRecipe:
     """
-    Deduce all necessary dataset buikder ingredients, i.e. the `DatasetRecipe`
+    Deduce all necessary dataset builder ingredients, i.e. the `DatasetRecipe`
     from the top-level training configuration.
     """
     conf = TrainingConfiguration(**configuration)
@@ -720,6 +560,8 @@ def deduce_dataset_recipe(configuration: Mapping) -> DatasetRecipe:
     class_name = conf.loaders.dataset
     instances_ID = conf.loaders.val.instances_ID
     # hopefully this produces a copy!?
+    # we use the validation transform configuration and expect here only
+    # fixed, non-augmenting transforms such as static scaling are defined
     transform_configurations = [
         elem.model_dump() for elem in conf.loaders.val.transform_configurations
     ]
@@ -729,39 +571,163 @@ def deduce_dataset_recipe(configuration: Mapping) -> DatasetRecipe:
                          kwargs=kwargs)
 
 
+from woodnet.datasets import get_builder_class
+
+
+def create_loader_from(recipe: DatasetRecipe,
+                       batch_size: int,
+                       num_workers: int,
+                       shuffle: bool = False,
+                       pin_memory: bool = False
+                       ) -> torch.utils.data.DataLoader:
+    builder_class = get_builder_class(recipe.class_name)
+    builder = builder_class()
+    datasets = builder.build(phase='val',
+                             instances_ID=recipe.IDs,
+                             transform_configurations=recipe.transform_confs,
+                             **recipe.kwargs)
+    dataset = torch.utils.data.ConcatDataset(datasets)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                         num_workers=num_workers, shuffle=shuffle,
+                                         pin_memory=pin_memory)
+    return loader
+
+
 
 @dataclasses.dataclass
 class EvalSpec:
     """
-    Encapsulate the core ingredients for the evaluation of a
-    training result:
+    Encapsulate the core ingredients for the evaluation of the results
+    of a single training experiment:
 
-    - the mapping from unique ID string(s) to model objects(s)
-      (all registered checkpoints will be evaluated)
+    - the mapping from unique model ID string(s) to corresponding
+      trained parameter files of the model objects(s) on disk
 
-    - the validation data ID strings
-      that were utilized for the respective CV fold
+    - the dataset recipe from which it can be fully resurrected
     """
-    models: Mapping[str, Path]
+    models_pathmap: Mapping[str, Path]
     dataset_recipe: DatasetRecipe
+    configuration: dict
 
 
+def inject_to_device_transform(loader: torch.utils.data.DataLoader,
+                               device: torch.device,
+                               non_blocking: bool = True):
+    """
+    Hack to insert to-device moving function into the
+    dataset transformer.
+    Note: Use with care! After this, all subsequent tensor transforms
+    have to support on-device execution!
+    """
+    to_device_transform = ToDevice(device=device, non_blocking=non_blocking)
+    dataset = loader.dataset
+    if isinstance(dataset, torch.utils.data.ConcatDataset):
+        for subdataset in dataset.datasets:
+            subdataset.transformer.transforms.insert(0, to_device_transform)
+    else:
+        dataset.transformer.transforms.insert(0, to_device_transform)
+    logger.info(f'Injected {to_device_transform} into DataLoader')
 
-def evaluate_folds(evalspecs: dict[str, EvalSpec],
+
+def evaluate_folds(evalspecs: Mapping[str, EvalSpec],
                    transforms: Sequence[CongruentParametrizations],
+                   batch_size: int,
                    device: torch.device,
                    dtype: torch.dtype,
                    use_amp: bool,
                    use_inference_mode: bool,
-                   display_fold_progress: bool,
-                   leave_fold_progress: bool,
-                   display_model_instance_progress: bool,
-                   display_transforms_progress: bool,
-                   display_parametrizations_progress: bool,
-                   display_loader_progress: bool
+                   non_blocking_transfer: bool = True,
+                   num_workers: int = 0,
+                   shuffle: int = False,
+                   pin_memory: bool =False,
+                   no_compile_override: bool = False,
+                   display_fold_progress: bool = True,
+                   leave_fold_progress: bool = True,
+                   display_models_progress: bool= True,
+                   display_transforms_progress: bool= True,
+                   display_parametrizations_progress: bool= True,
+                   display_loader_progress: bool = True,
+                   _inject_early_to_device: bool = True
                    ) -> dict:
     """
     Run a full prediction/evaluation over arbitrarily many folds.
+
+    Parameters
+    ----------
+
+    evalspecs : Mapping[str, EvalSpec]
+        Mapping from fold-wise string ID to evaluation specification that holds
+        model template and parameter information and the dataset information.
+    
+    transforms : Sequence of CongruentParametrizations
+        Sequence of containers for parametrized transforms that are applied to
+        the data elements. Utilized for robustness experiments.
+
+    batch_size : int
+        Batch sizse for the data loader.
+
+    device : torch.device
+        Inference device.
+        Note: All models are pushed there aggressively and eagerly. Use
+        `LazyModelDict` with garbage collections if OOM errors occur.
+
+    dtype : torch.dtype
+        Basal data type for model and data.
+
+    use_amp : bool
+        Use automatic mixed precision for core model forward method.
+
+    use_inference_mode : bool
+        Use PyTorch `inference_mode` instead of default `no_grad` mode.
+
+    non_blocking_transfer : bool, optional
+        Use non-blocking transfer when moving data to set device.
+        Defaults to `True`.
+
+    num_workers : int, optional
+        Number of worker processes used by the PyTorch `DataLoader`.
+        Defaults to 0, i.e. loading and processing in main process.
+
+    shuffle : bool, optional
+        Shuffle the data elements for repeated iterations over
+        the loader. Defaults to `False`.
+
+    pin_memory : bool, optional
+        Pin memory setting of the `DataLoader`. Defaults to `False`.
+
+    no_compile_override : bool, optional
+        Flag to disable model compilation during the resurrection process.
+        If not set, the compilation options from the training configuration
+        are used. Defaults to `False`.
+
+    display_fold_progress : bool optional
+        Draw progress bar for fold-wise evaluation progress. Defaults to `True`.
+
+    leave_fold_progress : bool, optional
+        Keep fold-wise progress bar after loop end. Defaults to `True`.
+
+    display_models_progress : bool optional
+        Draw progress bar for model-instance-wise evaluation progress. Defaults to `True`.
+
+    display_transforms_progress : bool optional
+        Draw progress bar for transforms-wise evaluation progress. Defaults to `True`.
+
+    display_parametrizations_progress : bool optional
+        Draw progress bar for parametrizations-wise evaluation progress. Defaults to `True`.
+
+    display_loader_progress : bool optional
+        Draw progress bar for loader-wise evaluation progress. Defaults to `True`.
+
+    _inject_early_to_device : bool, optional
+        Inject `ToDevice` transform into the static transforms attribute list
+        of the dataset of the loader.
+        NOTE: Use with care! This pushes all tensors on the device as first
+        action of the transformer pipeline!
+        This means that all subsequent transforms must be able to run with
+        device-located tensors! Furthermore, this may lead to OOM errors.
+
+    Notes
+    -----
 
     Deeply nested prediction that combines loops over the following elements:
 
@@ -780,80 +746,51 @@ def evaluate_folds(evalspecs: dict[str, EvalSpec],
 
     results: dict[str, dict] = {'folds' : {}}
 
-    for fold_ID, foldspec in evalspecs:
-        result = evaluate_multiple(models=foldspec.models_mapping,
-                                   loader=foldspec.loader,
-                                   transforms=transforms,
-                                   device=device, dtype=dtype, use_amp=use_amp,
-                                   use_inference_mode=use_inference_mode,
-                                   display_model_instance_progress=display_model_instance_progress,
-                                   display_transforms_progress=display_transforms_progress,
-                                   display_parametrizations_progress=display_parametrizations_progress,
-                                   display_loader_progress=display_loader_progress)
+    # TODO: Solve this more elegantly
+    # using num_worker > 0 and CUDA tensors in data loading leads to:
+    # RuntimeError: Cannot re-initialize CUDA in forked subprocess.
+    # To use CUDA with multiprocessing, you must use the 'spawn' start method
+    if _inject_early_to_device and num_workers > 0:
+        logger.warning(
+            f'Early to-device transfer and multiprocessing data loading is '
+            f'not supported. Overriding incompatible setting {num_workers=} '
+            f'to compatible setting num_workers = 0'
+        )
+        num_workers = 0
 
-        result['folds'][fold_ID] = result
+    for fold_ID, evalspec in evalspecs:
+        # preparation setup for this specific fold
+        models = resurrect_models_from(evalspec.models_pathmap,
+                                       configuration=evalspec.configuration,
+                                       dtype=dtype, device=device,
+                                       no_compile_override=no_compile_override,
+                                       eval_mode=True, testing_flag=True)
+
+        loader = create_loader_from(recipe=evalspec.dataset_recipe,
+                                    batch_size=batch_size,
+                                    num_workers=num_workers,
+                                    shuffle=shuffle,
+                                    pin_memory=pin_memory)
+        
+        if _inject_early_to_device:
+            inject_to_device_transform(loader, device=device,
+                                       non_blocking=non_blocking_transfer)
+
+        result = evaluate_multiple_inverted(models=models,
+                                            loader=loader,
+                                            transforms=transforms,
+                                            device=device, dtype=dtype, use_amp=use_amp,
+                                            use_inference_mode=use_inference_mode,
+                                            non_blocking_transfer=non_blocking_transfer,
+                                            display_transforms_progress=display_transforms_progress,
+                                            leave_transforms_progress=False,
+                                            display_parametrizations_progress=display_parametrizations_progress,
+                                            display_loader_progress=display_loader_progress,
+                                            display_models_progress=display_models_progress)
+
+        results['folds'][fold_ID] = recursive_value_to_statedict(result)
 
     return results
-
-
-
-
-from woodnet.inference.directories import TrainingResultBag
-from woodnet.inference.inference import (extract_IDs, extract_model_config,
-                                         transmogrify_state_dict,
-                                         deduce_loader_from_training)
-from woodnet.inference.utils import parse_checkpoint
-
-from woodnet.models import get_model_class
-
-
-def inject_state_dict(model: torch.nn.Module, state_dict: Mapping) -> None:
-    """
-    Loads state dict into the given model.
-    Helper function that automatically handles state dicts reconstructed
-    from compiled models.
-    """
-    try:
-        model.load_state_dict(state_dict)
-    except RuntimeError:
-        logger.warning('Direct state dict loading failed with runtime error. Re-attempting '
-                       'with transmogrified state dict.')
-    
-        state_dict = transmogrify_state_dict(state_dict)
-        model.load_state_dict(state_dict)
-    logger.info('Successfully loaded state dictionary.')
-
-
-from woodnet.models import create_model
-
-def _legacy_produce_evalspec_from(training_results_bag: TrainingResultBag) -> EvalSpec:
-    """
-    Produce the `EvalSpec` instance from the training results bag.
-
-    Parameters
-    ----------
-
-    training_results_bag : TrainingResultsBag
-        Compound data structure of training results.
-    """
-    configuration = training_results_bag.fetch_configuration()
-    IDs = extract_IDs(configuration)
-
-    models: dict[str, torch.nn.Module] = {}
-
-    for chkpt in training_results_bag.registered_checkpoints:
-        # deduce model template/class from the training configuration and
-        # create usable instances. Possibly compiles if configuration defines it. 
-        model = create_model(configuration)
-        # first force load to CPU/RAM: training and inference device may differ
-        state_dict = torch.load(chkpt.path, map_location='cpu')
-        logger.info(f'Successfully loaded checkpoint state dict from location \'{chkpt.path}\'.')
-        inject_state_dict(model, state_dict)
-        # construct model ID string: $qualifier_$UUID  or $UUID depdening on qualifier value
-        identifier = '_'.join((chkpt.qualifier, chkpt.UUID)) if chkpt.qualifier else chkpt.UUID
-        models[identifier] = model
-
-    return EvalSpec(models, IDs)
 
 
 
@@ -870,14 +807,13 @@ def produce_evalspec_from(training_results_bag: TrainingResultBag) -> EvalSpec:
     configuration = training_results_bag.fetch_configuration()
     recipe = deduce_dataset_recipe(configuration)
     # build mapping: string identifier to model parameters path
-    models = {}
+    models_pathmap = {}
     for chkpt in training_results_bag.registered_checkpoints:
         model_ID = chkpt.make_ID()
-        models[model_ID] = chkpt.path
-    return EvalSpec(models=models, dataset_recipe=recipe)
+        models_pathmap[model_ID] = chkpt.path
+    return EvalSpec(models_pathmap=models_pathmap, dataset_recipe=recipe,
+                    configuration=configuration)
 
-
-from woodnet.inference.directories import CrossValidationResultsBag
 
 
 def produce_foldspec_from(cv_results_bag: CrossValidationResultsBag) -> dict[str, EvalSpec]:

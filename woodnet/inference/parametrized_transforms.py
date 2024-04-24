@@ -30,6 +30,10 @@ def deduce_display_progressbar() -> bool:
 DISPLAY_PROGRESSBAR: bool = deduce_display_progressbar()
 
 
+def identity(x: torch.Tensor) -> torch.Tensor:
+    return x
+
+
 class ParametrizedTransform(NamedTuple):
     """
     Simple struct to hold human-readable string name, parameter settings
@@ -38,6 +42,16 @@ class ParametrizedTransform(NamedTuple):
     name: str
     parameters: Mapping
     transform: Callable[[torch.Tensor], torch.Tensor]
+
+    @classmethod
+    def make_identity(cls, name: str | None = None) -> 'ParametrizedTransform':
+        """
+        Make the identity transform, i.e. raw data passthrough.
+        Useful for robustness experiments, where the performance-altering effects of
+        parametrized transforms of the input data is tested. 
+        """
+        name = name or 'raw_inference'
+        return cls(name=name, parameters={}, transform=identity)
 
 
 
@@ -156,6 +170,22 @@ Parametrizations = list[ParametrizedTransform]
 CongruentParametrizations = CongruentTransformList[ParametrizedTransform]
 
 
+def make_identity_congruent_transform_list(name: str | None = None) -> CongruentTransformList:
+    parametrization = ParametrizedTransform.make_identity(name=name)
+    return CongruentTransformList([parametrization])
+
+
+def complete_with_identity(transforms: Sequence[CongruentParametrizations]
+                           ) -> list[CongruentParametrizations]:
+    """
+    Complete an exsiting sequence of parametrized transforms by
+    prepending the identity transform.
+    """
+    transforms = list(transforms)
+    transforms.insert(0, make_identity_congruent_transform_list())
+    return transforms
+
+
 """
 General helper functions and instantiation tooling.
 """
@@ -163,23 +193,31 @@ General helper functions and instantiation tooling.
 
 def get_transform_class(name: str) -> Type:
     """
-    Programmatically retrieve the transform class from cusotm code or
-    monai packagge.
+    Programmatically retrieve the transform class from custom code or monai package.
     """
-    module_names = ('monai.transforms', 'woodnet.transformations.transforms')
+    # note that internal transform classes have precendence
+    module_names = ('woodnet.transformations.transforms', 'monai.transforms')
+    classes = []
     for module_name in module_names:
         module = importlib.import_module(module_name)
         try:
-            class_ = getattr(module, name)
-            break
+            classes.append((getattr(module, name), module_name))
         except AttributeError:
             pass
-    else:
+
+    if not classes:
         # we did not find the class via string name in any of the modules
         raise AttributeError(f'could not retrieve requested transform class \'{name}\''
                              f'from modules {module_names}')
-    
-    logger.debug(f'retrieved class object {class_} for module \'{module_name}\'')
+
+    class_, module_name = classes[0]
+
+    if len(classes) > 1:
+        logger.warning(f'Transform class with name \'{name}\' is present N = '
+                       f'{len(classes)} times in module search space. '
+                       f'Using first occurrence from module \'{module_name}\'')
+
+    logger.debug(f'retrieved class object {class_} from module \'{module_name}\'')
     return class_
 
 

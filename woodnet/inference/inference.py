@@ -6,24 +6,22 @@ Facilitate inference runs.
 """
 import logging
 import torch
+import json
+import pickle
 
 import torch.amp
 import torch.utils
 import tqdm
 
-from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
 
 from woodnet.inference.parametrized_transforms import (CongruentParametrizations, Parametrizations,
                                                        generate_parametrized_transforms)
-
-from woodnet.inference.directories import CrossValidationResultsBag, create_inference_directory
-
-from woodnet.datasets.volumetric_inference import TransformedTileDatasetBuilder
-from woodnet.datasets.planar import TransformedEagerSliceDatasetBuilder
-
+from woodnet.inference.directories import CrossValidationResultsBag
+from woodnet.inference.evaluate import evaluate_folds, produce_foldspec_from
+from woodnet.datasets import get_builder_class
 from woodnet.custom.exceptions import ConfigurationError
 from woodnet.logtools.dict import LoggedDict
 from woodnet.configtools.validation import TrainingConfiguration
@@ -41,15 +39,6 @@ def maybe_wrap_loader(loader: torch.utils.data.DataLoader,
         'leave' : False
     }
     return tqdm.tqdm(loader, **settings)
-
-
-def get_transforms_name(transforms) -> str:
-    """Try to get/deduce the global semantical name of the transforms."""
-    try:
-        name = transforms.name
-    except AttributeError:
-        name = 'parametrized transforms'
-    return name
 
 
 def create_parametrized_transforms(configuration: Mapping) -> list[Parametrizations] | None:
@@ -88,7 +77,6 @@ def create_loader(configuration: Mapping) -> torch.utils.data.DataLoader:
     tileshape: tuple[int, int, int] = loaders_config.pop('tileshape', default=(128, 128, 128))
 
     assert name == 'TransformedTileDataset'
-    builder = TransformedTileDatasetBuilder()
 
     phase = 'val'
     phase_config = deepcopy(loaders_config[phase])
@@ -146,12 +134,7 @@ def deduce_loader_from_training(configuration: Mapping,
     """
     conf = TrainingConfiguration(**configuration)
 
-    datasetname2builder: dict[str, callable] = {
-        'TileDataset' : TransformedTileDatasetBuilder,
-        'EagerSliceDataset' : TransformedEagerSliceDatasetBuilder,
-        'TriaxialDataset' : NotImplemented
-    }
-
+    builder_class = get_builder_class(conf.loaders.dataset)
     instances_ID = conf.loaders.val.instances_ID
     transform_configurations = [
         elem.model_dump() for elem in conf.loaders.val.transform_configurations
@@ -161,10 +144,9 @@ def deduce_loader_from_training(configuration: Mapping,
     logger.info(f'Deduced instance ID set: {instances_ID}')
     logger.info(f'Deduced transform configurations: {transform_configurations}')
 
-    builder_class = datasetname2builder[conf.loaders.dataset]
     builder = builder_class()
 
-    datasets = builder.build(instances_ID=instances_ID, #phase='val',
+    datasets = builder.build(instances_ID=instances_ID, phase='val',
                              transform_configurations=transform_configurations,
                              **kwargs)
     
@@ -175,32 +157,101 @@ def deduce_loader_from_training(configuration: Mapping,
     return loader
 
 
+def increment_filename(path: Path) -> Path:
+    """Create new filename by incrementing/appending numbering scheme."""
+    stem = path.stem
+    suffix = path.suffix
+    try:
+        main_part, ID = stem.split('-')
+        ID = int(ID)
+    except ValueError:
+        # create new numbering appendix between stem and suffix
+        stem = '-'.join((stem, '1'))
+        name = ''.join((stem, suffix))
+    else:
+        ID += 1
+        stem = '-'.join((main_part, str(ID)))
+        name = ''.join((stem, suffix))
+    return path.parent / name
 
-def transmogrify_state_dict(state_dict: Mapping) -> OrderedDict:
+
+def write_json(data, path: Path) -> Path:
     """
-    Try to turn state dict from compiled model into normal state dict.
+    Write `data` as JSON to the indicated location at `path`.
+    Guards against overwriting by inserting `-$N` into the filename.     
     """
-    prefix: str = '_orig_mod.'
-    return OrderedDict({key.removeprefix(prefix) : value for key, value in state_dict.items()})
+    while path.exists():
+        logger.warning(f'Could not write JSON to preeixsting '
+                       f'location \'{path}\'. Applying filename incrementation.')
+        path = increment_filename(path)
+
+    with path.open(mode='w') as handle:
+        json.dump(data, fp=handle, indent=2, default=str)
+    return path
 
 
-
-def run_prediction_evaluation(basedir: Path,
-                              transforms: Sequence[CongruentParametrizations],
-                              device: torch.device,
-                              dtype: torch.dtype,
-                              use_amp: bool,
-                              use_inference_mode: bool,
-                              display_fold_progress: bool = True,
-                              leave_fold_progress: bool = True,
-                              display_model_instance_progress: bool = True,
-                              display_transforms_progress: bool = True,
-                              display_parametrizations_progress: bool = True,
-                              display_loader_progress: bool = True,                       
-                              loader_worker_count: int = 0
-                              ) -> dict:
+def write_pickle(data, path: Path) -> Path:
     """
-    Run full evaluation for a CV-fold training result.
+    Write `data` as serialized python object to the indicated location at `path`.
+    Guards against overwriting by inserting `-$N` into the filename.     
+    """
+    while path.exists():
+        logger.warning(f'Could not write pickle file to preexisting '
+                       f'location \'{path}\'. Applying filename incrementation.')
+        path = increment_filename(path)
+
+    with path.open(mode='wb') as handle:
+        pickle.dump(data, file=handle)
+    return path
+
+
+
+def run_evaluation(basedir: Path,
+                   transforms: Sequence[CongruentParametrizations],
+                   batch_size: int,
+                   device: torch.device,
+                   dtype: torch.dtype,
+                   use_amp: bool,
+                   use_inference_mode: bool,
+                   non_blocking_transfer: bool = True,
+                   num_workers: int = 0,
+                   shuffle: int = False,
+                   pin_memory: bool =False,
+                   no_compile_override: bool = False,
+                   display_fold_progress: bool = True,
+                   leave_fold_progress: bool = True,
+                   display_models_progress: bool= True,
+                   display_transforms_progress: bool = True,
+                   display_parametrizations_progress: bool= True,
+                   display_loader_progress: bool= True,
+                   inject_early_to_device: bool = False
+                   ) -> None:
+    """
+    Run full evaluation for a CV-fold training result and save
+    the resulting dict in the newly create inference directory.
     """
     cv_results_bag = CrossValidationResultsBag.from_directory(basedir)
-    inference_directory = create_inference_directory(basedir)
+    foldspec = produce_foldspec_from(cv_results_bag)
+    result = evaluate_folds(evalspecs=foldspec,
+                            transforms=transforms,
+                            batch_size=batch_size,
+                            device=device,
+                            dtype=dtype,
+                            use_amp=use_amp,
+                            use_inference_mode=use_inference_mode,
+                            non_blocking_transfer=non_blocking_transfer,
+                            num_workers=num_workers,
+                            shuffle=shuffle,
+                            pin_memory=pin_memory,
+                            no_compile_override=no_compile_override,
+                            display_fold_progress=display_fold_progress,
+                            leave_fold_progress=leave_fold_progress,
+                            display_models_progress=display_models_progress,
+                            display_transforms_progress=display_transforms_progress,
+                            display_parametrizations_progress=display_parametrizations_progress,
+                            display_loader_progress=display_loader_progress,
+                            _inject_early_to_device=inject_early_to_device)
+    
+    return result
+
+    

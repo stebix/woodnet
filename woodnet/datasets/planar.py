@@ -6,15 +6,20 @@ Jannik Stebani 2023
 import torch
 import numpy as np
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
+from functools import cached_property
 from torch import Tensor
 from typing import Optional, Literal, Union
+from pathlib import Path
 
-from woodnet.datasets import add_channel_dim
+import tqdm.auto as tqdm
+
+from woodnet.datasets.utils import add_channel_dim
 from woodnet.dataobjects import AbstractSlice, Volume
-
+from woodnet.datasets.constants import DEFAULT_CLASSLABEL_MAPPING, CLASSNAME_REMAP
 from woodnet.inference.parametrized_transforms import ParametrizedTransform
-
+from woodnet.transformations.transformer import Transformer
+from woodnet.transformations.buildtools import from_configurations 
 
 class SliceDataset(torch.utils.data.Dataset):
     """
@@ -80,7 +85,8 @@ class EagerSliceDataset(torch.utils.data.Dataset):
     # TODO: Refactor constructor without expicit dependency on volume
     def __init__(self,
                  phase: Literal['train', 'val'],
-                 volume: Volume,
+                 volume: np.ndarray,
+                 fingerprint: Mapping,
                  transformer: Optional[callable] = None,
                  classlabel_mapping: Optional[dict[str, int]] = None,
                  axis: int = 0,
@@ -88,20 +94,15 @@ class EagerSliceDataset(torch.utils.data.Dataset):
 
         self.phase = phase
         self.axis = axis
-        self.fingerpint = volume.fingerprint
-        self.volume = np.swapaxes(volume.data, 0, axis)
+        self.fingerprint = fingerprint
+        self.volume = np.swapaxes(volume, 0, axis)
         self.transformer = transformer
 
-        if self.phase == 'train' and classlabel_mapping is None:
-            raise RuntimeError('Training phase dataset requires a '
-                               'classlabel mapping!')
+        if self.phase in {'train', 'val'} and classlabel_mapping is None:
+            raise RuntimeError(f'Phase \'{self.phase}\' dataset requires a '
+                                'classlabel mapping!')
 
         self.classlabel_mapping = classlabel_mapping
-        # we assume that for the loaded volume the class is
-        #  constant 
-        self._label = torch.tensor(
-            self.classlabel_mapping[self.fingerpint.class_]
-        ).unsqueeze_(-1)
 
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor] | Tensor:        
@@ -113,26 +114,89 @@ class EagerSliceDataset(torch.utils.data.Dataset):
         if self.phase == 'test':
             return data
         
-        return (data, self._label)
-    
+        label = torch.tensor(self.label).unsqueeze(-1)
+        
+        return (data, label)
+
+
+    @cached_property
+    def label(self) -> int:
+        classname = self.fingerprint['class_']
+        try:
+            classvalue = self.classlabel_mapping[classname]
+        except KeyError:
+            classvalue = self.classlabel_mapping[CLASSNAME_REMAP[classname]]
+        return classvalue
+
 
     def __len__(self) -> int:
         return self.volume.shape[0]
-    
 
 
+import zarr
 
-class TransformedEagerSliceDatasetBuilder:
+def load_volume_from_zarr(filepath: Path,
+                          internal_path: str,
+                          squeeze: bool = True) -> tuple[np.ndarray, dict]:
+    """
+    Eagerly load the volume and data fingerprint of the Zarr file at the given location.
+    """
+    data = zarr.convenience.open(filepath, mode='r')
+    fingerprint = {k : v for k, v in data.attrs.items()}
+    # select sub-dataset and load everything into main memory
+    data = data[internal_path][...] if not squeeze else np.squeeze(data[internal_path][...])
+    return (data, fingerprint)
+
+
+class EagerSliceDatasetBuilder:
     """
     Programmatic dataset builder.
+    Note that this builder loads the data from the zar files and *not* from
+    the TIFF directories.
     """
+    internal_path: str = 'downsampled/half'
+    classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
+    # TODO: factor hardcoded paths out -> bad!
+    base_directory: Path = Path('/home/jannik/storage/wood/custom/')
+    pretty_phase_name_map = {'val' : 'validation', 'train' : 'training', 'test' : 'testing'}
+
     @classmethod
     def build(cls,
               instances_ID: Iterable[str],
               phase: Literal['train'] | Literal['val'] | Literal['test'],
               axis: int,
-              transform_configurations: Iterable[dict] | None = None,
-              parametrized_transform: ParametrizedTransform | None = None
+              transform_configurations: Iterable[dict] | None = None
               ) -> list[EagerSliceDataset]:
 
-        raise NotImplementedError('do it')
+        datasets = []
+        if transform_configurations:
+            transformer = Transformer(
+                *from_configurations(transform_configurations)
+            )
+        else:
+            transformer = None
+
+        phase_name = cls.pretty_phase_name_map.get(phase, phase)
+        desc = f'{phase_name} dataset build progress'
+        wrapped_IDs = tqdm.tqdm(instances_ID, unit='dataset', desc=desc, leave=False)
+        for ID in wrapped_IDs:
+            wrapped_IDs.set_postfix_str(f'current_ID=\'{ID}\'')
+            path = cls.get_path(ID)        
+            volume, fingerprint = load_volume_from_zarr(path, cls.internal_path)
+            dataset = EagerSliceDataset(
+                phase=phase, volume=volume, fingerprint=fingerprint,
+                transformer=transformer, classlabel_mapping=cls.classlabel_mapping,
+                axis=axis
+            )
+            datasets.append(dataset)
+        return datasets
+
+
+
+    @classmethod
+    def get_path(cls, ID: str) -> Path:
+        for child in cls.base_directory.iterdir():
+            if child.match(f'*/{ID}*'):
+                return child
+        raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
+                                f'basedir "{cls.base_directory}"')

@@ -274,11 +274,26 @@ class CrossValidationResultsBag:
 def create_inference_directory(basedir: Path) -> Path:
     """
     Create an inference run directory.
+    Layout sketch:
+
+        basedir
+            |--- inference
+            |      |---- $timestamp-1
+            |      |---- $timestamp-2
+            |      ...
+            |      |---- $timestamp-N
+
+    Timestamped subdirs should be unique and must not be preexisting.
+    Parent `inference` directory will be created if not present, but may preexist. 
     """
+    inference_basedir = basedir / 'inference'
+    inference_basedir = mkdir_logged(inference_basedir, allow_preexisting=True,
+                                     parents=False,
+                                     name='inference base directory')
     timestamp = create_timestamp()
-    inference_dir = basedir / timestamp
-    inference_dir = mkdir_logged(inference_dir, allow_preexisting=False, parents=True,
-                                 name='concrete inference')
-    return inference_dir
+    inference_rundir = inference_basedir / timestamp
+    inference_rundir = mkdir_logged(inference_rundir, allow_preexisting=False, parents=False,
+                                 name='inference run directory')
+    return inference_rundir
 
 

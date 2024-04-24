@@ -128,8 +128,11 @@ def set_parametrized_transform(data: DataProvider, /, transform: ParametrizedTra
     In-place set the parametrized transform of the given data provider.
     The abstract data provider may be a single dataset, a composite
     `torch.utils.data.ConcatDataset` or a list/tuple of `torch.utils.data.Dataset`. 
-    The underlying datasets shoudl possess the `ParametrizedTransformMixin`
-    to understand the role of the parametrized transform.
+    The underlying datasets must possess the `transformer` attribute that holds a
+    `woodnet.transformations.transformer.Transformer` instance, in turn supporting
+    the `parametrized_transform` attribute and protocol.
+    The protocol amounts to calling the parametrized transform with the data
+    output from the static pre-applied `transform` processing pipeline.    
 
     Parameters
     ----------
@@ -147,18 +150,18 @@ def set_parametrized_transform(data: DataProvider, /, transform: ParametrizedTra
     None
         Data(sets) are modified in-place.
     """
-    # pretty bad solution eh lol
+    # pretty bad solution eh? lol
     if isinstance(data, torch.utils.data.ConcatDataset):
         for subset in data.datasets:
-            subset.parametrized_transform = transform
+            subset.transformer.parametrized_transform = transform
     elif isinstance(data, (list, tuple)):
         for element in data:
-            element.parametrized_transform = transform
+            element.transformer.parametrized_transform = transform
     elif isinstance(data, torch.utils.data.Subset):
-        data.dataset.parametrized_transform = transform
+        data.dataset.transformer.parametrized_transform = transform
     # TODO: this breaks probably when the transformed dataset hierarchy is extended
     # to the other datasets.
     elif isinstance(data, torch.utils.data.Dataset):
-        data.parametrized_transform = transform
+        data.transformer.parametrized_transform = transform
     else:
         raise TypeError(f'cannot set parametrized transform on invalid type {type(data)}')

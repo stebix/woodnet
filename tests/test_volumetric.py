@@ -2,7 +2,7 @@ import logging
 import torch
 import pytest
 
-from woodnet.datasets import DEFAULT_CLASSLABEL_MAPPING
+from woodnet.datasets.constants import DEFAULT_CLASSLABEL_MAPPING
 from woodnet.datasets.volumetric_inference import TransformedTileDataset, ParametrizedTransform
 
 
