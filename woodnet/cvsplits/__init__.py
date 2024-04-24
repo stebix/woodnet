@@ -9,7 +9,7 @@ import sklearn.model_selection as skml
 
 from woodnet.configtools.validation import TrainingConfiguration
 from woodnet.custom.types import PathLike
-from woodnet.datasets import CLASS_ID_ORIENTATION_MAPPING
+from woodnet.datasets.constants import CLASS_ID_ORIENTATION_MAPPING
 
 
 
