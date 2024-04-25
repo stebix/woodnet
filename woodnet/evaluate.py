@@ -36,7 +36,7 @@ if not PRESETS_DIRECTORY.is_dir():
     )
 
 
-def load_parametrized_transforms_specs_from(preset_name: str) -> list[dict]:
+def load_parametrized_transforms_specs_from(preset_name: str, logger: logging.Logger) -> list[dict]:
     for item in PRESETS_DIRECTORY.iterdir():
         # use or with both conditions to allow user to select with
         # or without the file type suffix
@@ -48,15 +48,16 @@ def load_parametrized_transforms_specs_from(preset_name: str) -> list[dict]:
         )
     with item.open(mode='r') as handle:
         preset = json.load(handle)
+    logger.info(f'Successfully loaded transforms preset file from \'{item}\'')
     return preset
 
 
 
-def generate_transforms_from(preset_name: str) -> Sequence[CongruentParametrizations]:
+def generate_transforms_from(preset_name: str, logger: logging.Logger) -> Sequence[CongruentParametrizations]:
     """
     Automated and integrated generation of `transforms` from the preset name.
     """
-    specs = load_parametrized_transforms_specs_from(preset_name)
+    specs = load_parametrized_transforms_specs_from(preset_name, logger)
     transforms = [
         CongruentParametrizations(transform)
         for transform in generate_parametrized_transforms(*specs, squeeze=False)
@@ -134,10 +135,20 @@ def interpret_store_protocols(
     return store_protocols
 
 
+def write_preset_artifact(preset_name: str, directory: Path) -> Path:
+    """Write small artifact file that encodes the preset name."""
+    filepath = directory / f'PRESETARTIFACT_{preset_name}'
+    with filepath.open(mode='w') as handle:
+        handle.write(f'PRESET_ARTIFACT={preset_name}')
+    return filepath
+
+
+
 def write_results(data: Mapping,
                   protocols: Sequence[StoreProtocol],
                   directory: Path,
-                  logger: logging.Logger) -> None:
+                  logger: logging.Logger,
+                  preset_name: str | None = None) -> None:
     """Write the results to the directory."""
     filestem = 'evaluation'
     for protocol in protocols:
@@ -173,6 +184,11 @@ def write_results(data: Mapping,
             )
             continue
         logger.info(f'Successfully written data with {protocol} to \'{filepath}\'')
+    
+    if preset_name is not None:
+        filepath = write_preset_artifact(str(preset_name), directory)
+        logger.debug(f'Successfully written preset artifact file to \'{filepath}\'')
+
 
 
 def run_evaluation_experiment(basedir: str | Path,
@@ -224,7 +240,7 @@ def run_evaluation_experiment(basedir: str | Path,
     num_interop_threads = global_torchconf.get('torch_num_interop_threads' or TORCH_NUM_INTEROP_THREADS)
     configure_torch_cpu_threading(num_threads, num_interop_threads)
 
-    transforms = generate_transforms_from(transforms_preset)
+    transforms = generate_transforms_from(transforms_preset, logger)
 
     # finalize logging infrastructure -> start writuing to logfile on disk
     inference_directory = create_inference_directory(basedir)
@@ -261,10 +277,11 @@ def run_evaluation_experiment(basedir: str | Path,
                             pin_memory=pin_memory,
                             no_compile_override=no_compile_override,
                             inject_early_to_device=inject_early_to_device)
-
+    # report and store results
     logger.info(f'Concluded evaluation run for basedir \'{basedir}\'')
     write_results(result,
                   protocols=store_protocols,
-                  directory=inference_directory, logger=logger)
+                  directory=inference_directory,
+                  logger=logger, preset_name=transforms_preset)
     logger.info(f'Successful finalized evaluation experiment')
 

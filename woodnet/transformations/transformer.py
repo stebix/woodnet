@@ -20,7 +20,7 @@ class Transformer:
 
     def __init__(self, *transforms: TensorTransform,
                  parametrized_transform: ParametrizedTransform | None = None) -> None:
-        # TODO: does * provide us with a list or a tuple???
+        # TODO: Basic Python question: does * provide us with a list or a tuple???
         self.transforms = list(transforms)
         self._parametrized_transform = None
         self.parametrized_transform = parametrized_transform
