@@ -242,4 +242,44 @@ class GaussianBlur:
                 
             x = torch.stack(channels, dim=0)
         return x
-        
+
+
+
+class LowResolution:
+    """
+    Simulate lower resolution input data by downsampling data and
+    then upsampling again, leading to aliasing and image detail loss.
+    """
+    def __init__(self,
+                 scale_factor: float,
+                 downsample_interp_mode: str = 'nearest',
+                 upsample_interp_mode: str = 'bilinear',
+                 align_corners: bool = False,
+                 antialias: bool = False
+                ) -> None: 
+        self.scale_factor = scale_factor
+        self.downsample_interp_mode = downsample_interp_mode
+        self.upsample_interp_mode = upsample_interp_mode
+        self.align_corners = align_corners
+        self.antialias = antialias
+    
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        # save spatial shape of input, expected layout (C x D [x H x W])
+        input_shape = x.shape[2:]
+        lowered_shape = tuple(
+            int(elem)
+            for elem in np.round(np.array(input_shape) * self.scale_factor)
+        )        
+        downsampled = torch.nn.functional.interpolate(x, size=lowered_shape,
+                                                      mode=self.downsample_interp_mode,
+                                                      antialias=self.antialias)
+        upsampled = torch.nn.functional.interpolate(downsampled, size=input_shape,
+                                                    mode=self.upsample_interp_mode,
+                                                    antialias=self.antialias,
+                                                    align_corners=self.align_corners)
+        if upsampled.shape != x.shape:
+            logger.warning(
+                f'Failed to regain original shape {x.shape} after downsampling to '
+                f'{downsampled.shape}. Actual output shape was: {upsampled.shape}.'
+            )
+        return upsampled
