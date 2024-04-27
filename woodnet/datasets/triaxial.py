@@ -19,7 +19,7 @@ from typing import Literal
 from torch import Tensor
 
 from woodnet.datasets.constants import CLASSNAME_REMAP
-from woodnet.datasets.tiling import TileBuilder
+from woodnet.datasets.tiling import VolumeTileBuilder
 from woodnet.custom.types import PathLike
 from woodnet.inference.parametrized_transforms import ParametrizedTransform
 
@@ -258,7 +258,7 @@ class TriaxialDataset(torchdata.Dataset):
             )
         else:
             radius = self.baseshape[-1] // 2
-            builder = TileBuilder(
+            builder = VolumeTileBuilder(
                 baseshape=self.baseshape, tileshape=tileshape,
                 radius=radius
             )

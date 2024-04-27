@@ -17,7 +17,7 @@ import tqdm.auto as tqdm
 
 from woodnet.custom.types import PathLike
 from woodnet.datasets.constants import CLASSNAME_REMAP, DEFAULT_CLASSLABEL_MAPPING
-from woodnet.datasets.tiling import TileBuilder
+from woodnet.datasets.tiling import VolumeTileBuilder
 from woodnet.datasets.utils import get_spatial_shape
 from woodnet.transformations import from_configurations
 from woodnet.transformations.transformer import Transformer
@@ -57,7 +57,7 @@ class TileDataset(torch.utils.data.Dataset):
         self.baseshape = get_spatial_shape(self.volume.shape)
         # TODO: formalize this better
         radius = self.baseshape[-1] // 2
-        self.tilebuilder = TileBuilder(
+        self.tilebuilder = VolumeTileBuilder(
             baseshape=self.baseshape, tileshape=self.tileshape,
             radius=radius
         )
