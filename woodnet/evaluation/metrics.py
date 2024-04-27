@@ -91,6 +91,14 @@ def compute_F1(TP: int, FP: int, FN: int, epsilon: float = 1e-6) -> float:
 
 def compute_MCC(TP: int, TN: int, FP: int, FN: int, epsilon: float = 1e-6) -> float:
     """Matthews Correlation Coefficient"""
+    # Perform pre-emptive float cast to avert overflow errors at 
+    # pure python <-> numpy interface. For larger cardinality counts,
+    # the sqrt argument in the numerator becomes huge and may not
+    # be representable by 'np.int64' anymore. Numpy then uses
+    # array data type 'object' with pure python (infinite sized) integer
+    # elements. This however chokes the `np.sqrt` function with the rather
+    # unspecific error 'loop of ufunc does not support argument 0 of type int'    
+    TP, TN, FP, FN = float(TP), float(TN), float(FP), float(FN)
     numerator = TP * TN - FP * FN
     denominator = np.sqrt(
         (TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)

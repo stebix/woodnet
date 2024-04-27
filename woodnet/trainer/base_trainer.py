@@ -270,7 +270,23 @@ class Trainer:
                     prediction = self.model.final_nonlinearity(prediction)
 
                 cardinalities = compute_cardinalities(prediction, label)
-                running_validation_metrics.update(cardinalities)
+
+                # TODO: REMOVE after debugging
+                try:
+                    running_validation_metrics.update(cardinalities)
+                except (TypeError, ValueError, RuntimeError) as e:
+
+                    import traceback
+                    logger.error(
+                        f'Failed to update running validation metrics with cardinalities '
+                        f'{cardinalities}. TP = {cardinalities.TP} | FP = {cardinalities.FP}'
+                        f'FP = {cardinalities.FP} | FN = {cardinalities.FN} || '
+                        f'error = \'{e}\''
+                    )
+                    logger.error(f'traceback : \'{traceback.format_tb(e.__traceback__)}\'')
+                    logger.error(f'Runnning validation metrics state dict: \'{running_validation_metrics.state_dict()}\'')
+
+                # TODO: REMOVE END #############################################
         
         # report results
         loss_tag = f'loss/validation_{criterion.__class__.__name__}'

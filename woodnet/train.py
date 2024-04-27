@@ -422,9 +422,9 @@ def run_training_experiment_batch(configurations: Iterable[dict | Path | str],
             leave_total_progress=False
         )
 
-        logger.info(f'Succesfully created trainer object. initializing core training loop')
+        logger.info(f'Successfully created trainer object. Initializing core training loop')
         trainer.train()
-        logger.info('Succesfully concluded train method.')
+        logger.info('Successfully concluded train method.')
 
         # logging handler cleanup to avoid double logging
         logger.removeHandler(filehandler)
