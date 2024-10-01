@@ -180,15 +180,16 @@ def deduce_reader_class(path: PathLike) -> Reader:
     """
     suffix = extract_suffix(path)
     if suffix.endswith('zarr'):
-        return ZarrReader
+        reader = ZarrReader
     elif suffix.endswith('h5') or suffix.endswith('hdf5'):
-        return HDF5Reader
+        reader = HDF5Reader
     else:
         raise ValueError(f'Unsupported file format: {suffix}')
 
+    logger.debug(f'deduced reader class {reader} for file: \'{path}\'')
+    return reader
 
 if __name__ == '__main__':
     path = Path('/home/jannik/storage/wood/custom/CT10.zarr')
     fingerprint = read_fingerprint_from_zarr(path)
-    data = read_data_from_zarr(path, 'downsampled/half')
-    print(data.shape)
+    print(fingerprint)
