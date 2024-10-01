@@ -4,14 +4,13 @@ Implement 3D datasets for the wood CT data.
 Jannik Stebani 2023
 """
 import torch
-import zarr
+import logging
 
 from collections.abc import Callable
 from functools import cached_property
 from torch import Tensor
 from pathlib import Path
-from typing import Iterable, Literal
-
+from typing import Any, Iterable, Literal
 
 import tqdm.auto as tqdm
 
@@ -21,57 +20,95 @@ from woodnet.datasets.tiling import VolumeTileBuilder
 from woodnet.datasets.utils import get_spatial_shape
 from woodnet.transformations import from_configurations
 from woodnet.transformations.transformer import Transformer
+from woodnet.datasets.reader import Reader, deduce_reader_class
 
+# TODO: factor out hardcoded path -> move to ENV or CONF
+INTERNAL_PATH = 'downsampled/half'
+CLASSLABEL_MAPPING: dict[Any, int] = DEFAULT_CLASSLABEL_MAPPING
+
+Tileshape3D = tuple[int, int, int]
+
+DEFAULT_LOGGER_NAME = '.'.join(('main', __name__))
+logger = logging.getLogger(DEFAULT_LOGGER_NAME)
+
+logger.info(f'Volumetric datasets are using internal path: {INTERNAL_PATH}')
 
 
 class TileDataset(torch.utils.data.Dataset):
     """
     Dataset for 3D tile based loading of the data.
+
+    Parameters
+    ----------
+
+    path : PathLike
+        Path to the dataset on the file system.
+    
+    internal_path : str
+        Path within the dataset file to the actual data.
+
+    phase : Literal['train', 'val']
+        Phase of the dataset: training or validation.
+
+    tileshape : Tileshape3D
+        Shape of the 3D tiles to extract from the volume data.
+    
+    reader_class : type[Reader] | None
+        Reader class to use for loading the raw data from disk.
+        The reader class will be deduced from the file suffix if `None`.
+    
+    transformer : Callable | None
+        Transformation to apply to the data chunks before returning it.
+    
+    classlabel_mapping : dict[str, int] | None
+        Mapping of class names to integer labels.
+        Required for training phase datasets.
     """
     eager: bool = True
 
     def __init__(self,
                  path: PathLike,
+                 internal_path: str,
                  phase: Literal['train', 'val'],
-                 tileshape: tuple[int],
+                 tileshape: Tileshape3D,
+                 reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
-                 internal_path: str = 'downsampled/half') -> None:
+                 ) -> None:
 
         self.path = path
+        self.internal_path = internal_path
+        self.reader = self._init_reader(reader_class, path, internal_path)
         self.phase = phase
         self.tileshape = tileshape
         self.transformer = transformer
         self.classlabel_mapping = classlabel_mapping
-        self.internal_path = internal_path
 
         if self.phase == 'train' and classlabel_mapping is None:
             raise RuntimeError('Training phase dataset requires a '
                                'classlabel mapping!')
-        # underlying zarr storage with metadata fingerprint
-        self.data = zarr.convenience.open(self.path, mode='r')
-        self.fingerprint = {k : v for k, v in self.data.attrs.items()}
-        # lazily loaded volume data
-        self.volume = self.data[self.internal_path][...]
-
-        self.baseshape = get_spatial_shape(self.volume.shape)
+        
+        # eager loading of data and fingerprint
+        self.volume = self.reader.load_data()
+        self.fingerprint = self.reader.load_fingerprint()
         # TODO: formalize this better
+        self.baseshape = get_spatial_shape(self.volume.shape)
         radius = self.baseshape[-1] // 2
         self.tilebuilder = VolumeTileBuilder(
             baseshape=self.baseshape, tileshape=self.tileshape,
             radius=radius
         )
     
-
-    def _load_volume(self):
-        if self.eager:
-            return self.data[self.internal_path][...]
-        else:
-            return self.data[self.internal_path]
+    @staticmethod
+    def _init_reader(reader_class: type[Reader] | None, path: PathLike, internal_path: str) -> Reader:
+        if reader_class is None:
+            reader_class = deduce_reader_class(path)
+        return reader_class(path=path, internal_path=internal_path)
 
     
     @cached_property
     def label(self) -> int:
+        """Deduce the integer label of the class from the dataset fingerprint."""
         classname = self.fingerprint['class_']
         try:
             classvalue = self.classlabel_mapping[classname]
