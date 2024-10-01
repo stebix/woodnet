@@ -189,6 +189,10 @@ def deduce_reader_class(path: PathLike) -> Reader:
     logger.debug(f'deduced reader class {reader} for file: \'{path}\'')
     return reader
 
+
+
+
+# TODO: remove this after testing
 if __name__ == '__main__':
     path = Path('/home/jannik/storage/wood/custom/CT10.zarr')
     fingerprint = read_fingerprint_from_zarr(path)
