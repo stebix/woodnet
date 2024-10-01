@@ -4,6 +4,8 @@ import pytest
 import h5py
 import zarr
 
+from woodnet.datasets.reader import deduce_reader_class, HDF5Reader, ZarrReader
+
 DATA_SHAPE: tuple[int, int, int, int] = (1, 25, 25, 25)
 HDF5_INTERNAL_PATH: str = 'group/dataset'
 ZARR_INTERNAL_PATH: str = 'group/dataset'
@@ -24,7 +26,6 @@ def create_test_fingerprint() -> dict:
         'sourceID': 'test',
     }
 
-from woodnet.datasets.reader import deduce_reader_class, HDF5Reader, ZarrReader
 
 @pytest.fixture
 def HDF5_testdata(tmp_path) -> tuple[Path, np.ndarray, dict]:
