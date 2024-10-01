@@ -255,16 +255,21 @@ class LowResolution:
                  downsample_interp_mode: str = 'nearest',
                  upsample_interp_mode: str = 'bilinear',
                  align_corners: bool = False,
-                 antialias: bool = False
+                 antialias: bool = False,
+                 use_fake_batch_dim: bool = False
                 ) -> None: 
         self.scale_factor = scale_factor
         self.downsample_interp_mode = downsample_interp_mode
         self.upsample_interp_mode = upsample_interp_mode
         self.align_corners = align_corners
         self.antialias = antialias
+        self.use_fake_batch_dim = use_fake_batch_dim
     
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
-        # save spatial shape of input, expected layout (C x D [x H x W])
+        # raw input from dataset has expected layout ([N x] C x D [x H x W])
+        if self.use_fake_batch_dim:
+            x = x.unsqueeze(dim=0)
+        # save spatial shape of input, expected layout (N x C x D [x H x W])
         input_shape = x.shape[2:]
         lowered_shape = tuple(
             int(elem)
@@ -282,4 +287,6 @@ class LowResolution:
                 f'Failed to regain original shape {x.shape} after downsampling to '
                 f'{downsampled.shape}. Actual output shape was: {upsampled.shape}.'
             )
+        if self.use_fake_batch_dim:
+            upsampled = torch.squeeze(upsampled, dim=0)
         return upsampled

@@ -206,7 +206,7 @@ class TiledEagerSliceDataset(torch.utils.data.Dataset):
         self.tileshape = tileshape
         self.z_spacing = z_spacing
 
-        self.z_size = self.volume[0]
+        self.z_size = self.volume.shape[0]
         self.baseshape = self.volume.shape[1:]
         self.radius = self.baseshape[-1] // 2
         logger.info(f'Constructed {self.__class__.__name__} with deduced baseshape '
@@ -231,7 +231,7 @@ class TiledEagerSliceDataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor] | Tensor:        
         # transform flat index into staged/hierarchical index
         staged_index = self.index_transformer(index)
-        tile = self.tilebuilder[staged_index.in_plane_index]
+        tile = self.tilebuilder.tiles[staged_index.in_plane_index]
         data = torch.tensor(add_channel_dim(
             self.volume[staged_index.z_plane_index][tile])
         )
@@ -258,7 +258,7 @@ class TiledEagerSliceDataset(torch.utils.data.Dataset):
 
 
     def __len__(self) -> int:
-        return self.volume.shape[0]
+        return self.length
 
 
 

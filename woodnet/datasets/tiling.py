@@ -360,8 +360,6 @@ class VolumeTileBuilder:
 
 
 
-
-
 class PlanarTileBuilder:
     """
     Compute tiles (i.e. cubic subvolumes) for a cylindrical region inside a 3D voxel volume.
@@ -395,11 +393,11 @@ class PlanarTileBuilder:
                  baseshape: tuple[int],
                  tileshape: tuple[int],
                  radius: int,
-                 prepend_wildcards: int = 1):
+                 prepend_wildcards: int = 0):
         
-        for shape, dims in zip((baseshape, tileshape), ((1, 2), None)):
+        for shape, dims in zip((baseshape, tileshape), (None, None)):
             if not is_2D(shape):
-                raise ValueError(f'expected 2D shape, got  ndim = {len(shape)}')
+                raise ValueError(f'expected 2D shape, got ndim = {len(shape)}')
             if not is_square(shape, dims=dims):
                 raise ValueError(f'expected square shape but got {shape}')
         # check for fitting of cylinder to embedding volume 

@@ -78,6 +78,25 @@ class PlanarLoaders(Config):
         return {'axis' : self.axis}
 
 
+class TiledPlanarLoaders(Config):
+    """Training and validation loaders for 2D planar setup."""
+    dataset: Literal['TiledEagerSliceDataset']
+    axis: int
+    tileshape: tuple[int, int]
+    z_spacing: int
+    num_workers: int | None = None
+    batchsize: int | None = None
+    pin_memory: bool | None = None
+
+    train: TrainingLoader
+    val: ValidationLoader
+
+    def dataset_kwargs(self) -> dict:
+        return {'axis' : self.axis,
+                'z_spacing' : self.z_spacing,
+                'tileshape' : self.tileshape}
+
+
 class TriaxialLoaders(Config):
     """Training and validation loaders for 2.5D triaxial setup."""
     dataset: Literal['TriaxialDataset']
@@ -119,6 +138,7 @@ class TrainingConfiguration(Config):
     loss: Loss
     trainer: Trainer
     loaders: Union[PlanarLoaders,
+                   TiledPlanarLoaders,
                    TriaxialLoaders,
                    VolumetricLoaders] = pydantic.Field(..., discriminator='dataset')
 

@@ -4,11 +4,142 @@ evaluation result files as pandas dataframes.
 
 @jsteb 2024
 """
+import pickle
 import numpy as np
 import pandas as pd
 
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from pathlib import Path
 
+from frozendict import frozendict
+
+############### Tooling basic loading and wrangling the nested dictionary 
+
+INDEX_NAMES: list[str] = ['fold', 'model_ID', 'transform', 'stage', 'metric']
+
+# The loaded structure is a deeply nested dict. These type hints should
+# clarify the level we are operating at.
+TransformResultMapping = Mapping
+InstanceResultMapping = Mapping
+MultiInstanceResultMapping = Mapping
+FoldwiseResultMapping = Mapping
+
+
+def construct_stage_mapping(result: TransformResultMapping) -> dict[str, frozendict]:
+    stage_mapping: dict[str, frozendict] = {}
+    for i, parameters in enumerate(result['results'].keys(), start=1):
+        stage_mapping[f'stage_{i}'] = parameters
+    return stage_mapping
+
+
+def invert(d: Mapping) -> dict:
+    return {v : k for k, v in d.items()}
+
+
+def remodel_transform_result(result: TransformResultMapping) -> tuple[dict, dict]:
+    """
+    Convert the parameterization information contained in the `frozendict` keys
+    into a generic `stage-$N` ID string. Returns a copy.
+    """
+    # extract necessary information
+    metadata = result.get('metadata')
+    parametrizations = result.get('results')
+    # setup conversion and cleaning
+    stage_mapping = construct_stage_mapping(result)
+    fdict_to_stage = invert(stage_mapping)
+    converted = {}
+    for old_key, value in parametrizations.items():
+        new_key = fdict_to_stage.get(old_key)
+        converted[new_key] = deepcopy(value)
+    return (converted, stage_mapping)
+
+
+def remodel_instance_result(result: InstanceResultMapping) -> tuple[dict, dict]:
+    remodeled_transform_results = {}
+    transform_stage_mappings = {}
+    for transform_name, transform_result in result.items():
+        remodulation, stage_mapping = remodel_transform_result(transform_result)
+        remodeled_transform_results[transform_name] = remodulation
+        transform_stage_mappings[transform_name] = stage_mapping
+    return (remodeled_transform_results, transform_stage_mappings)
+
+
+def remodel_multiinstance_result(result: MultiInstanceResultMapping) -> tuple[dict, dict]:
+    remodeled_instance_results = {}
+    instance_wise_stage_mappings = {}
+    for mdl_instance_ID, instance_result in result.items():
+        remodulation, stage_mappings = remodel_instance_result(instance_result)
+        remodeled_instance_results[mdl_instance_ID] = remodulation
+        instance_wise_stage_mappings[mdl_instance_ID] = stage_mappings
+    return (remodeled_instance_results, instance_wise_stage_mappings)
+
+    
+def remodel_foldwise_result(result: FoldwiseResultMapping) -> tuple[dict, dict]:
+    remodeled_multiinstance_results = {}
+    multiinstance_wise_stage_mappings = {}
+    for fold_ID, multiinstance_result in result.items():
+        remodulation, stage_mappings = remodel_multiinstance_result(multiinstance_result)
+        remodeled_multiinstance_results[fold_ID] = remodulation
+        multiinstance_wise_stage_mappings[fold_ID] = stage_mappings
+    return (remodeled_multiinstance_results, multiinstance_wise_stage_mappings)
+    
+
+def as_tuplekeyed(dictionary: dict) -> list:
+    """
+    Transform a nested dictionary into a list of 2-tuples.
+    The first element is the 'trace' of keys traversed to arrive
+    at the value, with the discovered value as the second element.
+    """
+    cache = []
+    
+    def _into(dictionary, prefix=()):
+        for key, value in dictionary.items():
+            current_prefix = (*prefix, key)
+            if isinstance(value, dict):
+                _into(value, current_prefix)
+                continue 
+            cache.append((current_prefix, value))
+    
+    _into(dictionary)        
+    return cache
+
+
+def to_dataframe(tuplekeyed: list[tuple]) -> pd.DataFrame:
+    """
+    Transform tuplekeyed data into a pandas DataFrame
+    with a hierarchical multiindex.
+    """
+    indices, values = zip(*tuplekeyed)
+    df = pd.DataFrame(values, index=pd.MultiIndex.from_tuples(indices))
+    return df
+    
+
+
+def preprocess_evaluation_result(result: Mapping) -> pd.DataFrame:
+    """Integrated preprocessing of a result mapping into a pandas data frame."""
+    result, _ = remodel_foldwise_result(result)
+    # TODO: Maybe insert check for congruency here
+    tuplekeyed = as_tuplekeyed(result)
+    df = to_dataframe(tuplekeyed)
+    df = df.rename_axis(index=tuple(INDEX_NAMES))
+    return df
+
+
+def sort_at_stagelevel(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Sort the multi-indexed results dataframe at the 'stage' level
+    of the multi-index. Useful after the additioan of the identity
+    transform as stage 0, since then ordering of the stages is
+    not ascending. 
+    """
+    stagelevel = df.index.names.index('stage')
+    return df.sort_index(level=stagelevel, inplace=False, ascending=True)
+
+
+############### Tooling for transforming a loaded and properly indexed dataframe
+# (i.e. multiindex with correct index level names) by adding the null/identity
+# as the 'stage-0' element to every individual transformation
 
 NameMapping = Mapping[str, str]
 LevelMapping = Mapping[int, str]
@@ -187,7 +318,26 @@ def add_identity_as_stage_zero(df: pd.DataFrame) -> pd.DataFrame:
         for transform in transforms
     ]
     additional_dfs = remodel_dataframe_by_remapping(id_subsec, remappings)
-    expanded_df = pd.concat([df, additional_dfs])
+    expanded_df = pd.concat([df, *additional_dfs])
     expanded_df.sort_index()
     return expanded_df
+
+
+
+
+def load_from_pkl(filepath: Path | str) -> pd.DataFrame:
+    """
+    Fully integrated loading and processing of results data.
+    Automatically converts to multi-indexed DataFrame and adds the identity
+    transformation as stage-0 for all other transforms.
+    """
+    filepath = Path(filepath) if not isinstance(filepath, Path) else filepath
+
+    with filepath.open(mode='rb') as handle:
+        data = pickle.load(handle)
     
+    data = data['folds']
+    df = preprocess_evaluation_result(data)
+    df = add_identity_as_stage_zero(df)
+    df = sort_at_stagelevel(df)
+    return df

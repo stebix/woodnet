@@ -56,7 +56,7 @@ def configure_evaluate_parser(parser: argparse.ArgumentParser) -> argparse.Argum
     parser.add_argument('--num-workers', '-n', type=int, default=0,
                         help='Set the worker process count for the PyTorch DataLoader.')
     parser.add_argument('--device', '-d', type=str, default='cuda:0',
-                        help='Set the inference device. Canb be \'cpu\' or \'cuda:$N\'')
+                        help='Set the inference device. Can be \'cpu\' or \'cuda:$N\'')
     parser.add_argument('--no-amp', action='store_true',
                         help='Disable automatic mixed precision (amp).')
     parser.add_argument('--use-no-grad', action='store_true',
