@@ -5,6 +5,7 @@ Constant mappings about the datasets.
 """
 # WOOD_DATA_DIRECTORY = Path(os.environ.get('WOOD_DATA_DIRECTORY'))
 from pathlib import Path
+from typing import Any
 
 from woodnet.utils import generate_keyset
 
@@ -16,7 +17,7 @@ COMPLETE_DATASET_DIRECTORY = WOOD_DATA_DIRECTORY / 'complete'
 SUBVOLUME_DATASET_DIRECTORY = WOOD_DATA_DIRECTORY / 'chunked'
 # default mapping from semantic class names towards the
 # numerical values
-DEFAULT_CLASSLABEL_MAPPING = {
+DEFAULT_CLASSLABEL_MAPPING: dict[Any, int] = {
     'acer' : 0,
     'pinus' :  1
 }
