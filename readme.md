@@ -223,6 +223,10 @@ train:
       mean: 1
       std:  0.5
 ```
+for the transformations, we can again make use of the simple `keyword : value` syntax of YAML. Minimally, the name attribute of the transform is required to find the corresponding class in the code.
+We can use custom transformation classes that are implemented inside the namespace/module `woodnet.transformations.transforms`. If we want to randomize the choice of transformations we can employ the container classes located in `woodnet.transformations.container`.
+An additional set of diverse transformations is provided via the [MONAI](https://docs.monai.io/en/stable/transforms.html#vanilla-transforms) third party package. These transforms are also automatically recognized via the name attribute (must exactly match the class name).
+The configuration is again performed via keyword passthrough. 
 
 
 #### Validation Loader Subblock
