@@ -2,8 +2,6 @@ class_to_label_mapping:
   acer : 0
   pinus : 1
 
-internal_path: 'downsampled/half'
-
 instance_mapping :
   CT2:
     location: '/home/jannik/storage/wood/custom/CT2.zarr'
@@ -85,3 +83,6 @@ instance_mapping :
     location: '/home/jannik/storage/wood/custom/CT22.zarr'
     classname : pinus
     group : axial
+
+
+internal_path: 'downsampled/half'
