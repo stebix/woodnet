@@ -201,8 +201,11 @@ loaders:
 ```
 
 > [!WARNING]
-> Note that we have to make sure that the data dimensionality matches the model dimensionality.
-> Otherwise we may get dimensionality and shape mismatch errors at the beginning of the training experiment. 
+> Note that we have to make sure that the data dimensionality (2D, 2.5D, 3D) matches the model dimensionality.
+> Otherwise we may get shape mismatch errors at the beginning of the training experiment. 
+
+The `num_workers` setting allows us to set the worker process count for data loading. It should be a nonnegative integer and the setting `0` symbolozes single-thread data loading (everything happens in the main thread). The performance implications of this setting can be subtantial (both positive and negative) and are interdependent with other aspects/settings (i.e. data processing and augmentation, rad speeds, ...). To get sensible orientation data for optimal settings, we may use the `benchmark` CLI tool provided by the `woodnet` package.
+The `pin_memory` setting toggles the usage of pinned, i.e. non-paged memory for the Pytorch CPU-based tensors. Using pinned memory can increase data transfer performance in certain scenarios. 
 
 #### Training Loader Subblock
 
