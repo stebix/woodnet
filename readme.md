@@ -125,9 +125,42 @@ Any further keyword arguments are passed through to the optimizer instance at in
 
 ### Loss Function Block
 
+In this block we can select the loss function. Similar to the optimizer block, we have full access to the Pytorch-supplied [loss functions](https://pytorch.org/docs/stable/nn.html#loss-functions).
 ```yaml
 loss:
   name: BCEWithLogitsLoss
   reduction: mean
 ```
+Again, the loss function class is selected via the `name` field that must mathc the desired loss function class of Pytorch.
+Any further keyword arguments are passed trough to the class initializer function.
 
+
+### Trainer Block
+
+The trainer block can be utilized to set core parameters of the training experiment run.
+Major settings are explained via comments in the following exemplary trainer configuration:
+```yaml
+trainer:
+  # select the trainer class via its string name
+  name: Trainer
+  # set the log frequency of core model metrics
+  log_after_iters: 1000
+  # set the frequency for performing a validation run
+  validate_after_iters: 2500
+  # set the maximum allowed number of epochs and iterations
+  max_num_epochs: 500
+  max_num_iters: 175000
+  # select the validation metric and indicate whether a higher or lower score is better
+  # for the current setting 'classification accuracy' (ACC), obviously higher is better
+  validation_metric: ACC
+  validation_metric_higher_is_better: True
+```
+For a validation run, the training is paused and predictions for all validation data instances will be performed. The result of this run (i.e. the validation metric score) is reported to the log file and sent to the tensorboard inspection tool.
+Also, the model weights are saved as a checkpoint if the score for a validation run is optimal or in the top-`k`-optimal range.
+We can set the maximum number of iterations and epochs as an exit condition for conclusion of the training experiment. Note that the system exits the experiment run as soon as the first of both criterions is fulfilled.
+
+
+## About
+
+Author Jannik Stebani. Released under the MIT license.
+Accompanying manuscript: TODO:INSERT
