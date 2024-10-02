@@ -108,3 +108,22 @@ model:
 ```
 In this example, we selected the `ResNet3D` from our model zoo and configured it to have a single input channel. Single channel data is typical for monochromatic computed tomography data. For light microscopy data, we may encounter multi channel data due to the separate measurement of red, green and blue intensity (RGB) in a photographic sensor.
 We also set the model compilation flag. Thusly, the model will be compiled at the first iteration at the cost of a small, singular latency increase and the benefit of substantial acceleration during following iterations.
+
+
+### Optimizer Block
+
+```yaml
+optimizer:
+  name: Adam
+  learning_rate: 1e-3
+```
+
+
+### Loss Function Block
+
+```yaml
+loss:
+  name: BCEWithLogitsLoss
+  reduction: mean
+```
+
