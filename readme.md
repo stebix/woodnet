@@ -63,21 +63,30 @@ section component.
 
 ### General Block
 
-This block sets the output directory for the training experiment and the training device.
+This block sets the output directory for the training experiment and the training device. It generally looks like so:
+```yaml
+experiment_directory: /path/to/awesome/experiment-dir
+device: cuda:1
+```
 
 #### Training Directory
 
-The training directory is the central collection location where all permanent artifacts of our
+The training directory (i.e. `experiment-dir` in the above example) is the central collection location where all permanent artifacts of our
 training experiment are saved.
 The permanent artifacts are:
-    - Trained model weight checkpoints: this is the primary result of our experiment!
-    - Log file: a large number of settings, events and stuff is logged for later inspection in a text log file
-    - Configuration file: the configuration file for the training experiment is backed up in this directory as well. This enables the analysis of the experiment later on (very handy!).
-    - `tensorboard` log file: We use this library to visualize and analyse the training experiment on the fly. More on this later.
 
-The directory will be created if it is not present.
+- Trained model weight checkpoints: this is the primary result of our experiment! A `checkpoints` subdirectory contains all checkpoints files. 
+
+- Log file: a large number of settings, events and stuff is logged for later inspection in a text log file. This file is located in a `logs` folder inside the `experiment_directory`.
+
+- Configuration file: the configuration file for the training experiment is backed up in this directory as well. This enables the analysis of the experiment later on (very handy!). This file is also located in the `logs` directory.
+
+- `tensorboard` log file: We use this library to visualize and analyse the training experiment on the fly. More on this later. This file is also located in the `logs` directory.
+
+The directory will be created if it is not present. Due to the unqiueness of all above artifacts to a single training experiments it is highly recommended to choose a new training directory for each individiual training experiment.
 
 
-Inside it, the training configuration file
-is saved as a backup and for retrospective analysis. Also, the model weight checkpoints
-are saved in a subdirectory.
+#### Device
+
+The device option lets us choose the device on which we want to perform the training experiment calculation. The common options are `cpu` for (often infeasibly slow) central processing unit (CPU) training or `cuda` for accelerated graphic processing unit (GPU) training. For systems that sport multiple GPUs, we can use `cuda:$N` with `$N` indicating an appropriate integer that pins the specific GPU in our system on which we desire the traniing experiment to run on.
+
