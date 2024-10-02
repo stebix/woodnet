@@ -18,6 +18,33 @@ class EquiprobableSelector:
     Container that can hold any number of internals transforms.
     Selects one of the internal transforms upon being called, each one
     with equal probability and applies it to the provided input.
+
+    Parameters
+    ----------
+
+    members : Sequence[dict]
+        A sequence of dictionaries, each representing a valid transform configuration.
+
+    seed : int, optional
+        The random seed for selecting transforms (default is 123).
+
+    **kwargs : dict
+        Additional keyword arguments.
+
+    Attributes
+    ----------
+
+    propagate_seed : bool
+        Whether to propagate the seed to the internal transforms.
+
+    _seed : int
+        The random seed for selecting transforms.
+
+    _transforms : list[Callable]
+        The list of internal transforms.
+
+    _kwargs : dict
+        Additional keyword arguments.
     """
     propagate_seed: bool = False
 
@@ -28,6 +55,21 @@ class EquiprobableSelector:
         
 
     def __call__(self, tensor: Tensor) -> Tensor:
+        """
+        Apply a randomly selected transform to the input tensor.
+
+        Parameters
+        ----------
+
+        tensor : Tensor
+            The input tensor to be transformed.
+
+        Returns
+        -------
+
+        Tensor
+            The transformed tensor.
+        """
         transform = random.choice(self._transforms)
         return transform(tensor)
     
@@ -43,6 +85,21 @@ class EquiprobableSelector:
 
 
     def create_transforms(self, members: Sequence[dict]) -> list[Callable]:
+        """
+        Create a list of transforms from the provided configurations.
+
+        Parameters
+        ----------
+
+        members : Sequence[dict]
+            A sequence of dictionaries, each representing a valid transform configuration.
+
+        Returns
+        -------
+
+        list[Callable]
+            The list of instantiated transforms.
+        """
         members = deepcopy(members)
         transforms = []
         for configuration in members:
