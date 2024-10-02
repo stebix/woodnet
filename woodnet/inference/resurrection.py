@@ -22,7 +22,35 @@ def configure_model(model: torch.nn.Module,
                     device: torch.device,
                     eval_mode: bool,
                     testing_flag: bool) -> torch.nn.Module:
-    """Configure model according to settings."""
+    """
+    Configure model in-place according to settings.
+    
+    Parameters
+    ----------
+
+    model : torch.nn.Module
+        Model instance to be configured.
+
+    dtype : torch.dtype
+        Data type to be used for model parameters.
+
+    device : torch.device
+        Device to be used for model. Weights are pushed to this device.
+
+    eval_mode : bool
+        Flag to set model to evaluation mode.
+
+    testing_flag : bool
+        Flag to set model to testing mode.
+        Usually this setting triggers the application of the final nonlinearity.
+        For testing, the nonlinearity is applied.
+        For training (non-testing), the nonlinearity is usually absorbed into the loss function.
+
+    Returns
+    -------
+
+    model : torch.nn.Module
+    """
     model = model.to(dtype=dtype, device=device)
     if eval_mode:
         model.eval()
@@ -34,6 +62,19 @@ def configure_model(model: torch.nn.Module,
 def transmogrify_state_dict(state_dict: Mapping) -> OrderedDict:
     """
     Try to turn state dict from compiled model into normal state dict.
+    For `torch.compile` models, the state dict is prefixed with '_orig_mod.'
+
+    Parameters
+    ----------
+
+    state_dict : Mapping
+        State dictionary from compiled model.
+
+    Returns
+    -------
+
+    state_dict : OrderedDict
+        State dictionary with prefix removed.
     """
     prefix: str = '_orig_mod.'
     return OrderedDict({key.removeprefix(prefix) : value for key, value in state_dict.items()})
@@ -41,9 +82,20 @@ def transmogrify_state_dict(state_dict: Mapping) -> OrderedDict:
 
 def inject_state_dict(model: torch.nn.Module, state_dict: Mapping) -> None:
     """
-    Loads state dict into the given model.
+    Loads state dict into the given model in-place.
     Helper function that automates the handling of state dicts reconstructed
     from compiled models via a transmogrification attempt.
+
+    Parameters
+    ----------
+
+    model : torch.nn.Module
+        Model instance to be loaded with state dict.
+
+    state_dict : Mapping
+        State dictionary to be loaded into the model. Can originate from
+        an uncompiled or compiled model.
+
     """
     try:
         model.load_state_dict(state_dict)
@@ -53,6 +105,7 @@ def inject_state_dict(model: torch.nn.Module, state_dict: Mapping) -> None:
         state_dict = transmogrify_state_dict(state_dict)
         model.load_state_dict(state_dict)
     logger.info('Successfully loaded state dictionary.')
+
 
 
 class LazyModelDict(UserDict):
@@ -121,6 +174,44 @@ def resurrect_models_from(pathmap: Mapping[str, Path],
     """
     Eagerly resurrect models by constructing a mapping from string ID to
     callable model instance from a path mapping.
+
+    Parameters
+    ----------
+
+    pathmap : Mapping[str, Path]
+        Mapping from unique model string ID to checkpoint file location.
+
+    configuration : Mapping
+        Top-level configuration. Must at least define a
+        model subsection.
+
+    dtype : torch.dtype
+        Data type to be used for model parameters.
+
+    device : torch.device
+        Device to be used for model. Weights are pushed to this device.
+
+    no_compile_override : bool, optional
+        Optional switch to fully disable compilation. Overrides
+        any compilation options defined by the configuration mapping.
+        Defaults to 'False', i.e. usage of the configuration options.
+
+    eval_mode : bool, optional
+        Flag to set model to evaluation mode. Defaults to 'True'.
+
+    testing_flag : bool, optional
+        Flag to set model to testing mode. Defaults to 'True'.
+        Usually this setting triggers the application of the final nonlinearity.
+        For testing, the nonlinearity is applied.
+        For training (non-testing), the nonlinearity is usually absorbed into the loss function.
+
+        
+    Returns
+    -------
+
+    models : dict[str, Callable | torch.nn.Module]
+        Mapping from string ID to model instances that are fully configured
+        according to input settings.
     """
     models = {}
     for ID, path in pathmap.items():
