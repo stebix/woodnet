@@ -15,16 +15,15 @@ from typing import Any, Iterable, Literal
 import tqdm.auto as tqdm
 
 from woodnet.custom.types import PathLike
-from woodnet.datasets.constants import CLASSNAME_REMAP, DEFAULT_CLASSLABEL_MAPPING
 from woodnet.datasets.tiling import VolumeTileBuilder
 from woodnet.datasets.utils import get_spatial_shape
 from woodnet.transformations import from_configurations
 from woodnet.transformations.transformer import Transformer
 from woodnet.datasets.reader import Reader, deduce_reader_class
+from woodnet.datasets.setup import (InstanceFingerprint,
+                                    DATA_CONFIGURATION, INSTANCE_MAPPING,
+                                    INTERNAL_PATH, CLASSLABEL_MAPPING)
 
-# TODO: factor out hardcoded path -> move to ENV or CONF
-INTERNAL_PATH = 'downsampled/half'
-CLASSLABEL_MAPPING: dict[Any, int] = DEFAULT_CLASSLABEL_MAPPING
 
 Tileshape3D = tuple[int, int, int]
 
@@ -113,7 +112,8 @@ class TileDataset(torch.utils.data.Dataset):
         try:
             classvalue = self.classlabel_mapping[classname]
         except KeyError:
-            classvalue = self.classlabel_mapping[CLASSNAME_REMAP[classname]]
+            raise KeyError(f'could not assign integer class value to class name \'{classname}\' - '
+                           f'not found in classlabel mapping {self.classlabel_mapping.keys()}')
         return classvalue
 
 
@@ -162,24 +162,22 @@ class TileDataset(torch.utils.data.Dataset):
         return str(self)
     
 
-
 class BaseTileDatasetBuilder:
     """
     Build a 3D TileDataset programmatically.
 
     Thin class, basically acts as a namespace. Maybe move to module?
     """
-    internal_path: str = 'downsampled/half'
-    classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
-    # TODO: factor hardcoded paths out -> bad!
-    base_directory: Path = Path('/home/jannik/storage/wood/custom/')
+    instance_mapping: dict[str, InstanceFingerprint] = INSTANCE_MAPPING
+    classlabel_mapping: dict[str, int] = CLASSLABEL_MAPPING
+    internal_path: str = INTERNAL_PATH
     pretty_phase_name_map = {'val' : 'validation', 'train' : 'training', 'test' : 'testing'}
 
     def build(cls,
               dataset_class: type,
               instances_ID: Iterable[str],
               phase: Literal['train', 'val', 'test'],
-              tileshape: tuple[int, int, int],
+              tileshape: Tileshape3D,
               transform_configurations: Iterable[dict] | None = None,
               **kwargs
               ) -> list[TileDataset]:
@@ -211,11 +209,13 @@ class BaseTileDatasetBuilder:
 
     @classmethod
     def get_path(cls, ID: str) -> Path:
-        for child in cls.base_directory.iterdir():
-            if child.match(f'*/{ID}*'):
-                return child
-        raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
-                                f'basedir "{cls.base_directory}"')
+        try:
+            fingerprint = cls.instance_mapping[ID]
+        except KeyError:
+            raise FileNotFoundError(f'could not retrieve dataset instance with ID "{ID}" - '
+                                    f'check if ID is present in the data configuration!')
+
+        return fingerprint.location
 
 
 
