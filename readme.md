@@ -19,8 +19,8 @@ It consists of three necessary building blocks. The `class_to_label_mapping` sec
 the mapping from human-readable, semantic class names to integer numbers:
 ```yaml
 class_to_label_mapping:
-  acer : 0
-  pinus : 1
+  softwood : 0
+  hardwood : 1
 ```
 The second building block is the instance mapping part where we can specify the dataset instances
 as unique string IDs to use these IDs in other places (e.g. configurations and dataset builders).
@@ -46,11 +46,38 @@ classification task.
 The last attribute of the fingerprint is the `group` attribute. Here we have the option to specify furhter information about sub-groups in our data. Subsets of single classes may belong to a subgroup,
 if some data parameters may be shared.
 An illustrative example could be: We want to perform binary classification between hardwood and softwood
-specied and for both classes we have a large number of samples. 
+specied and for both classes we have a large number of samples. For both classes, we obtained
+samples from freshly logged wood that we mark with the `group: pristine` attribute.
+We additionally got samples that were exposed to the elements and mark these with the
+`group: withered` attribute. We can use the `group` data instance attribute during the comutation of the cross-validation splits of the specified instances into the training set and the validation set.
+In addition to the "default" variant of class-stratified `k`-fold cross-validation we may then
+employ group-wise `k`-fold cross-validation. Then we can evaluate whether the model is able/flexible/intelligent enough to generalize across groups.
 
 
 ## Training Run Configuration
 
 In this section we take a look at how to use the provided command line interface (CLI) and
 configuration files (YAML) to perform a training run.
+We dissect an exemplary training configuration file by taking a closer look at each individual
+section component.
 
+### General Block
+
+This block sets the output directory for the training experiment and the training device.
+
+#### Training Directory
+
+The training directory is the central collection location where all permanent artifacts of our
+training experiment are saved.
+The permanent artifacts are:
+    - Trained model weight checkpoints: this is the primary result of our experiment!
+    - Log file: a large number of settings, events and stuff is logged for later inspection in a text log file
+    - Configuration file: the configuration file for the training experiment is backed up in this directory as well. This enables the analysis of the experiment later on (very handy!).
+    - `tensorboard` log file: We use this library to visualize and analyse the training experiment on the fly. More on this later.
+
+The directory will be created if it is not present.
+
+
+Inside it, the training configuration file
+is saved as a backup and for retrospective analysis. Also, the model weight checkpoints
+are saved in a subdirectory.
