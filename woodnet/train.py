@@ -12,8 +12,10 @@ import woodnet.logtools.dict.ops as logged
 
 from woodnet.models import create_model
 from woodnet.custom.exceptions import ConfigurationError
+from woodnet.datasets import get_builder_class
 from woodnet.datasets.volumetric import TileDatasetBuilder
-from woodnet.trainer import retrieve_trainer_class
+from woodnet.trainer import retrieve_trainer_class, TrainerClass
+
 from woodnet.directoryhandlers import ExperimentDirectoryHandler
 from woodnet.configtools import load_yaml, backup_configuration
 from woodnet.hooks import install_loginterceptor_excepthook
@@ -30,7 +32,62 @@ DataLoader = torch.utils.data.DataLoader
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
+# setting to control whether to backup the configuration file
 BACKUP_CONFIGURATION_FILE: bool = bool(os.environ.get('BACKUP_CONFIGURATION_FILE', default=1))
+# environment variable setting the action to take in case of overlapping IDs
+# use 'warn' to emit a warning, 'raise' to raise an exception
+TRAIN_VAL_OVERLAP_ACTION: str = os.environ.get('TRAIN_VAL_OVERLAP_ACTION', default='warn')
+
+
+def get_ID_overlap(phase_configs: dict[str, dict]) -> set:
+    """
+    Check for overlapping IDs in phase configurations.
+    
+    Parameters
+    ----------
+
+    phase_configs : dict[str, dict]
+        Dictionary phase configurations as values. At least the `instances_ID`
+        key specifying the data for the phase must be present in each phase configuration.
+
+    Returns
+    -------
+
+    overlap : set
+        Total set of overlapping IDs between the phase configurations.
+    """
+    overlap = set()
+    seen = set()
+    for phase_config in phase_configs.values():
+        new_IDs = set(phase_config.get('instances_ID', []))
+        overlap |= seen & new_IDs
+        seen |= new_IDs
+    return overlap 
+
+
+def check_ID_overlap(phase_configs: dict[str, dict]) -> None:
+    """
+    Check for overlapping IDs in phase configurations and take action if necessary.
+
+    Parameters
+    ----------
+
+    phase_configs : dict[str, dict]
+        Dictionary phase configurations as values. At least the `instances_ID`
+        key specifying the data for the phase must be present in each phase configuration.
+    """
+    overlap = get_ID_overlap(phase_configs)
+    if overlap:
+        message = (f'Overlapping IDs detected: {overlap}. This may be '
+                   f'undesirable and lead to data leakage.')
+        if TRAIN_VAL_OVERLAP_ACTION == 'warn':
+            warnings.warn(message)
+            logger.warning(message)
+        elif TRAIN_VAL_OVERLAP_ACTION == 'raise':
+            raise ConfigurationError(message)
+        else:
+            logger.error(f'Unknown action \'{TRAIN_VAL_OVERLAP_ACTION}\' for overlapping IDs')
+
 
 
 def create_optimizer(model: Callable | torch.nn.Module,
@@ -99,7 +156,6 @@ def create_loaders_LEGACY(configuration: dict) -> dict[str, torch.utils.data.Dat
     return loaders
 
 
-from woodnet.datasets import get_builder_class
 
 def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader]:
     """
@@ -113,6 +169,7 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     # differentiate subconfigurations and mutate
     # residual key - value pairs must be valid for dataset builder build method
     phase_configs = {phase : loaders_config.pop(phase) for phase in ('train', 'val')}
+    check_ID_overlap(phase_configs)
     name = loaders_config.pop('dataset')
     # torch data loader settings
     num_workers = logged.pop(loaders_config, key='num_workers', default=1)
@@ -140,8 +197,6 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     return loaders
 
 
-from woodnet.trainer import TrainerClass, retrieve_trainer_class
-
 
 def get_trainer_class(configuration: dict) -> TrainerClass:
     """Extract the trainer class from the top-level configuration."""
@@ -152,8 +207,6 @@ def get_trainer_class(configuration: dict) -> TrainerClass:
     class_name = logged.get(subconfig, 'name', 'Trainer')
     trainer_class = retrieve_trainer_class(class_name)
     return trainer_class
-
-
 
 
 
