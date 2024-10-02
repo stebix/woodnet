@@ -1,6 +1,5 @@
 import torch
 
-
 from woodnet.models.volumetric import ResNet3D
 
 

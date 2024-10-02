@@ -13,6 +13,7 @@ def test_smoke_builder():
     ]
     IDs = ['CT10', 'CT20']
     builder = TileDatasetBuilder()
+    raise Exception
 
     datasets = builder.build(IDs,
                              phase=phase, tileshape=tileshape,
