@@ -90,3 +90,21 @@ The directory will be created if it is not present. Due to the unqiueness of all
 
 The device option lets us choose the device on which we want to perform the training experiment calculation. The common options are `cpu` for (often infeasibly slow) central processing unit (CPU) training or `cuda` for accelerated graphic processing unit (GPU) training. For systems that sport multiple GPUs, we can use `cuda:$N` with `$N` indicating an appropriate integer that pins the specific GPU in our system on which we desire the traniing experiment to run on.
 
+
+### Model Block
+
+In the model block, we configure our core deep learning model.
+In genreal, we can set all user-facing parameters in the initializer (i.e. `__init__` method) of the model class here. Additionally, model ahead-of-time (AOT) and just-in-time (JIT) compilation
+flags can be set here. For more information on AOT and JIT-functionality via `torch.compile` please consider the [PyTorch docs](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html).
+A typical model block may look like this:
+```yaml
+model:
+  name: ResNet3D
+  in_channels: 1
+  compile:
+    enabled: True
+    dynamic: False
+    fullgraph: False
+```
+In this example, we selected the `ResNet3D` from our model zoo and configured it to have a single input channel. Single channel data is typical for monochromatic computed tomography data. For light microscopy data, we may encounter multi channel data due to the separate measurement of red, green and blue intensity (RGB) in a photographic sensor.
+We also set the model compilation flag. Thusly, the model will be compiled at the first iteration at the cost of a small, singular latency increase and the benefit of substantial acceleration during following iterations.
