@@ -62,6 +62,49 @@ class TileDataset(torch.utils.data.Dataset):
     classlabel_mapping : dict[str, int] | None
         Mapping of class names to integer labels.
         Required for training phase datasets.
+
+    Attributes
+    ----------
+
+    path : PathLike
+        Path to the underlying dataset on the file system.
+    
+    internal_path : str
+        Path within the dataset file to the actual data.
+
+    reader : Reader
+        Reader instance to load the data from disk. Must match the
+        basal file format of the dataset.
+
+    phase : Literal['train', 'val']
+        Phase of the dataset: training or validation.
+
+    tileshape : Tileshape3D
+        Shape of the 3D tiles to extract from the entire volume data.
+
+    transformer : Callable | None
+        Transformation to apply to the data chunks before emitting
+        them in the __getitem__ function.
+
+    classlabel_mapping : dict[str, int] | None
+        Mapping of class names to integer labels.
+        Required for training phase datasets.
+    
+    volume : ndarray
+        The entire volume data loaded from disk.
+    
+    fingerprint : dict
+        Fingerprint metadata of the dataset instance.
+
+    baseshape : tuple[int]
+        The spatial shape of the volume data.
+
+    tilebuilder : VolumeTileBuilder
+        Tile builder instance to create the tile indices.
+
+    label : int
+        Integer label of the class deduced from the fingerprint.
+        Constant for the entire dataset instance.
     """
     eager: bool = True
 
@@ -138,6 +181,7 @@ class TileDataset(torch.utils.data.Dataset):
 
 
     def __len__(self) -> int:
+        """Number of elements in the dataset instance."""
         return len(self.tilebuilder.tiles)
 
     
