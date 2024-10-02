@@ -112,11 +112,15 @@ We also set the model compilation flag. Thusly, the model will be compiled at th
 
 ### Optimizer Block
 
+This block specifies optimizer, i.e. the algorithm with which we compute our gradients to perform the descent step each iteration. Here, you may select from all `PyTorch`-provided algorithms that live in
+the [`torch.optim`](`https://pytorch.org/docs/stable/optim.html#algorithms`) namespace. Popular choices include `Adam` and `SGD`.
 ```yaml
 optimizer:
   name: Adam
   learning_rate: 1e-3
 ```
+The most important optimizer hyperparameter, the step size during gradient descent, is the `learning_rate`. It must always be provided.
+Any further keyword arguments are passed through to the optimizer instance at initialization time.
 
 
 ### Loss Function Block
