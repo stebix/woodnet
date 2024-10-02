@@ -5,6 +5,7 @@
 How to insert custom data into the pipeline: [Data Loading](#data-loading)
 How to configure a training run: [Training Run Configuration](#training-run-configuration)
 
+
 ## Data Loading
 
 The central place to inject data into the `woodnet` system is via the `dataconf.yaml` configuration file.
@@ -88,7 +89,7 @@ The directory will be created if it is not present. Due to the unqiueness of all
 
 #### Device
 
-The device option lets us choose the device on which we want to perform the training experiment calculation. The common options are `cpu` for (often infeasibly slow) central processing unit (CPU) training or `cuda` for accelerated graphic processing unit (GPU) training. For systems that sport multiple GPUs, we can use `cuda:$N` with `$N` indicating an appropriate integer that pins the specific GPU in our system on which we desire the traniing experiment to run on.
+The device option lets us choose the device on which we want to perform the training experiment calculation. The common options are `cpu` for (often infeasibly slow) central processing unit (CPU) training or `cuda` for accelerated graphic processing unit (GPU) training. For systems that sport multiple GPUs, we can use `cuda:$N` with `$N` indicating an appropriate integer that pins the specific GPU in our system on which we desire the training experiment to run on.
 
 
 ### Model Block
@@ -154,10 +155,97 @@ trainer:
   # for the current setting 'classification accuracy' (ACC), obviously higher is better
   validation_metric: ACC
   validation_metric_higher_is_better: True
+  # configure the top-k-cache of of model weights we want to retain for this training experiment 
+  score_registry:
+    name: Registry
+    capacity: 4
+    score_preference: higher_is_better
+  # advanced training experiment debugging: set parameter/gradient/... 
+  # logging and visualization in tensorboard 
+  parameter_logger:
+    name: HistogramLogger
+
 ```
 For a validation run, the training is paused and predictions for all validation data instances will be performed. The result of this run (i.e. the validation metric score) is reported to the log file and sent to the tensorboard inspection tool.
 Also, the model weights are saved as a checkpoint if the score for a validation run is optimal or in the top-`k`-optimal range.
 We can set the maximum number of iterations and epochs as an exit condition for conclusion of the training experiment. Note that the system exits the experiment run as soon as the first of both criterions is fulfilled.
+
+
+### Loaders Block
+
+The loaders block is concerned with configuring the data loading.
+In the global block, we can configure general settings. The two following subblocks
+are concerned with settings that are specific to the data loading and processing within the
+two distinct phases, namely the `train` (training) phase and the `val` (validation) phase.  
+
+#### Global Loaders Subblock
+
+We can select the dataset class via the `dataset` attribute in the global loaders subblock.
+This is the primary setting for selection of the 2D, 2.5D and 3D formulations of the pipeline.
+The dataset classes and their accompanying builder classes implement the loading of the raw data from the file system into the main memory and their partitioning inot appropriately shaped elements.
+For `TileDataset`, we would receive subvolume chunks formed according to `tileshape` like $(t_z, t_y, t_x)$.
+For `TriaxialDataset`, we would receive concatenated triaxial slices of the form $(3, t_y, t_x)$.
+For `TiledEagerSliceDataset`, we would receive planar slices of the form $(t_y, t_x)$.
+```yaml
+loaders:
+  # select the dataset class
+  dataset: TileDataset
+  # set the size of the of the subvolume or slice-tile
+  tileshape: [256, 256, 256]
+  # batch size setting - tune to VRAM memory availability
+  batchsize: 2
+  # set multiprocessing worker count for data loaders
+  num_workers: 0
+  # toggle memory pinning for the data loader
+  pin_memory: True
+```
+
+> [!WARNING]
+> Note that we have to make sure that the data dimensionality matches the model dimensionality.
+> Otherwise we may get dimensionality and shape mismatch errors at the beginning of the training experiment. 
+
+#### Training Loader Subblock
+
+The training loader subblock must be included in the global loaders block.
+Here we can set the dataset instances that are used for training the model weights by writing the desired instance IDs into the `instances_ID` list.
+For training data augmentation, we can also specify one or as many as desired training data transformations as elemtns of a list under the key `transform_configurations`.
+```yaml
+train:
+  # select the training data instances via the unqiue identifiers that were set in the
+  # data configuration file
+  instances_ID: [awesome-unicorn, acer-sample-1, pinus-sample-3]
+
+  transform_configurations:
+    - name: Normalize
+      mean: 1
+      std:  0.5
+```
+
+
+#### Validation Loader Subblock
+
+
+The validation loader section is in principle very similar to the training loaders subblock. An exemplary instance is given below
+```yaml
+val:
+  instances_ID: [jean-luc-picard, acer-sample-2, pinus-sample-1701]
+
+  transform_configurations:
+    - name: Normalize
+      mean: 1.1
+      std:  0.52
+```
+Usually, the transformations applied to the validation data elements differ from the training data transformations.
+Firstly, we have to compute features like mean and standard deviation differently for every subset to avoid premature feature engineering.
+Secondly, the generation of synthetic data via augmentation is a beneficial procedure applied in the training phase. However, in the validation phase usually unaugmented data is utilized.  
+
+
+## Further Usage Ideas
+
+The presented pipeline implementation could serve in different to the wood science community.
+Firstly, the implementation could be adopted as a purpose-built template to inject **custom CT data** of wood samples to gauge classification performance for this specific dataset.
+Furthermore, adoption to **light microscopic** datasets is easily conceivable since a fully planar 2D formulation is included in the package.
+Also, usage with **multiplanar microscopic** images is possible. For this, the triaxial formulation with a preset ordering for the typical wood anatomic cross sections may be appropriate. 
 
 
 ## About
