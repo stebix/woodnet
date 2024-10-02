@@ -8,7 +8,6 @@ import logging
 import numpy as np
 import torch
 import torch.utils.data as torchdata
-import zarr
 import tqdm.auto as tqdm
 
 from pathlib import Path
@@ -18,11 +17,13 @@ from collections.abc import Callable, Sequence, Iterable
 from typing import Literal
 from torch import Tensor
 
-from woodnet.datasets.constants import CLASSNAME_REMAP
+from woodnet.datasets.setup import (InstanceFingerprint,
+                                    INTERNAL_PATH, CLASSLABEL_MAPPING, INSTANCE_MAPPING)
 from woodnet.datasets.tiling import VolumeTileBuilder
 from woodnet.custom.types import PathLike
-from woodnet.inference.parametrized_transforms import ParametrizedTransform
-
+from woodnet.transformations.transformer import Transformer
+from woodnet.transformations.buildtools import from_configurations
+from woodnet.datasets.reader import Reader, deduce_reader_class
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
@@ -35,8 +36,23 @@ TileSlice = tuple[slice, ...]
 
 def generate_plane_slice(axis: int, index: int) -> tuple[slice]:
     """
-    Generate the index & slice tuple that selects the plane along the
+    Generate the index & slice tuple that selects the 2D plane along the
     given axis and position.
+
+    Parameters
+    ----------
+
+    axis : int
+        Axis index to select the plane from.
+
+    index : int
+        Position index along the axis.
+
+    Returns
+    -------
+
+    slice : tuple[slice]
+        3-tuple of slice objects that select the 2D plane.
     """
     slices = [slice(None, None), slice(None, None), slice(None, None)]
     slices[axis] = index
@@ -44,9 +60,24 @@ def generate_plane_slice(axis: int, index: int) -> tuple[slice]:
 
 
 def generate_orthogonal_slices(shape: tuple[int, int, int],
-                               stride: tuple[int, int, int]) -> tuple[slice]:
+                               stride: tuple[int, int, int]) -> tuple[slice, ...]:
     """
     Generate 3-tuples of slices that select the orthogonal planes.
+
+    Parameters
+    ----------
+
+    shape : tuple[int, int, int]
+        Shape of the 3D volume from which to generate the planes.
+    
+    stride : tuple[int, int, int]
+        Stride along the axes to generate the planes.
+
+    Returns
+    -------
+
+    slices : tuple[slice, ...]
+        Tuple of 3-tuples of slices that select the orthogonal planes.
     """
     slices = []
     for axis_index, (axis_size, stride) in enumerate(zip(shape, stride)):
@@ -60,7 +91,25 @@ def generate_orthogonal_slices(shape: tuple[int, int, int],
 def select_stack_func(backend: Literal['numpy', 'torch']) -> Callable[[Sequence[ArrayLike]], ArrayLike]:
     """
     Select the `stack` function for the backends `numpy` and `torch` and provide it as
-    a single-argument function.
+    a single-argument function by fixing the axis or dim argument to the first axis.
+
+    Parameters
+    ----------
+
+    backend : Literal['numpy', 'torch']
+        Backend choice for the stack function.
+    
+    Returns
+    -------
+
+    stack_fn : Callable[[Sequence[ArrayLike]], ArrayLike]
+        Function that stacks the input sequence of arrays along the first axis.
+
+    Raises
+    ------
+
+    ValueError
+        If the backend choice is not 'numpy' or 'torch'.
     """
     if backend == 'numpy':
         return partial(np.stack, axis=0)
@@ -76,6 +125,21 @@ def generate_orthogonal_planes(volume: ArrayLike,
     """
     Generate the orthogonal planes along the three canonical dimensions.
     Assumes that the three trailing dimensions are the spatial dimensions.
+
+    Parameters
+    ----------
+
+    volume : ArrayLike
+        3D volume from which to generate the orthogonal planes.
+
+    stride : tuple[int, int, int]
+        Stride along the axes to generate the planes.
+
+    Returns
+    -------
+
+    orthoplanes : tuple[ArrayLike]
+        Tuple of 2D planes along the three canonical dimensions.
     """
     backend = 'numpy' if isinstance(volume, np.ndarray) else 'torch'
     stack_fn = select_stack_func(backend)
@@ -94,7 +158,24 @@ def is_square(shape: Iterable[int],
               dims: tuple[int] | None = None) -> bool:
     """
     Check if shape-like object is square along the indicate dimensions.
-    Defaults to None, meaning that all dimensons are considered.    
+    Defaults to None, meaning that all dimensons are considered.
+
+    Parameters
+    ----------
+
+    shape : Iterable[int]
+        Iterable containing integer shape information to check for squareness.
+
+    dims : tuple[int] | None
+        Tuple of dimensions to check for squareness. Defaults to None,
+        which means that all dimensions are checked.
+
+
+    Returns
+    -------
+
+    is_square : bool
+        Boolean indicating whether the shape is square along the indicated dimensions.
     """
     if dims is None:
         dims = np.s_[:]
@@ -115,7 +196,7 @@ def generate_maximal_tile_OLD(shape: tuple[int, int, int],
     Along the vertical z-axis, the full volume is utilized.
     
     Parameters
-    ==========
+    ----------
     
     shape : tuple[int, int, int]
         Base 3D volume shape.
@@ -153,7 +234,7 @@ def generate_maximal_tile(shape: tuple[int, int, int],
     Along the vertical z-axis, the full volume is utilized.
     
     Parameters
-    ==========
+    ----------
     
     shape : tuple[int, int, int]
         Base 3D volume shape.
@@ -180,6 +261,7 @@ def generate_maximal_tile(shape: tuple[int, int, int],
 
 
 def size_from_slice(slc: slice) -> int:
+    """Compute the size of a slice along an axis."""
     return slc.stop - slc.start
 
 def get_spatial_shape(shape: tuple[int]) -> tuple[int]:
@@ -194,15 +276,92 @@ class TriaxialDataset(torchdata.Dataset):
 
     The dataset can provide the orthogonal images for the maximal available
     volume and many small subvolumes.
+
+    Parameters
+    ----------
+
+    path : PathLike
+        Path to the underlying raw data on the filesystem.
+
+    internal_path : str
+        Internal path to the data inside the storage container.
+
+    phase : Literal['train', 'val']
+        Phase of the dataset: training or validation.
+
+    planestride : tuple[int, int, int]
+        Stride along the three axes to generate the orthogonal planes.
+
+    tileshape : TileShape | None, optional
+        Desired tileshape. If `None`, the maximally available tile is selected.
+        The actual orthoplanes are generated from within the tiles.
+
+    reader_class : type[Reader] | None, optional
+        Reader class to use for loading the raw data from disk.
+        The reader class will be deduced from the file suffix if `None`.
+
+    transformer : Callable | None, optional
+        Transformer class/callable that is applied to the orthogonal
+        plane elements before returning them.
+
+    classlabel_mapping : dict[str, int] | None, optional
+        Mapping of class names to integer labels.
+        Required for training phase datasets.
+
+        
+    Attributes
+    ----------
+
+    path : PathLike
+        Path to the underlying raw data on the filesystem.
+
+    internal_path : str
+        Internal path to the data inside the storage container.
+
+    phase : Literal['train', 'val']
+        Phase of the dataset: training or validation.
+
+    planestride : tuple[int, int, int]
+        Stride along the three axes to generate the orthogonal planes.
+
+    transformer : Callable | None
+        Transformer class/callable that is applied to the orthogonal planes
+        before returning them.
+
+    classlabel_mapping : dict[str, int] | None
+        Mapping of class names to integer labels.
+
+    volume : ndarray
+        The entire volume data loaded from disk.
+
+    fingerprint : dict
+        Metadata fingerprint of the dataset.
+
+    baseshape : tuple[int, int, int]
+        Basal shape of the 3D volume data.
+
+    tileshape : TileShape
+        Shape of the 3D tiles. From these tiles the orthogonal planes are generated.
+
+    tiles : list[TileSlice]
+        List of 3-tuples of slice objects that select the tiles from the full volume.
+    
+    orthoplanes : list[ArrayLike]
+        List of concatenated 2D orthogonal planes along the three
+        canonical dimensions.
+    
+    label : int
+        Integer label of the dataset instance.
     """
     def __init__(self,
                  path: PathLike,
+                 internal_path: str,
                  phase: Literal['train', 'val'],
                  planestride: tuple[int, int, int],
                  tileshape: TileShape | None = None,
+                 reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
-                 internal_path: str = 'downsampled/half'
                  ) -> None:
 
         super().__init__()
@@ -213,18 +372,27 @@ class TriaxialDataset(torchdata.Dataset):
         self.transformer = transformer
         self.classlabel_mapping = classlabel_mapping
         self.internal_path = internal_path
+        self.reader = self._init_reader(reader_class, path, internal_path)
         
         if self.phase in {'train', 'val'} and classlabel_mapping is None:
             raise RuntimeError(f'Phase \'{self.phase}\' dataset requires a '
                                f'classlabel mapping!')
-        # underlying zarr storage with metadata fingerprint
-        self.data = zarr.convenience.open(self.path, mode='r')
-        self.fingerprint = {k : v for k, v in self.data.attrs.items()}
-        # lazily loaded volume data
-        self.volume = self.data[self.internal_path][...]
+        
+        # load from underlying storage with metadata fingerprint
+        self.volume = self.reader.load_data()
+        self.fingerprint = self.reader.load_fingerprint()
+
         self.baseshape = get_spatial_shape(self.volume.shape)
         self.tileshape, self.tiles = self._generate_tiles(tileshape)
         self.orthoplanes = self._generate_orthoplanes()
+
+
+    @staticmethod
+    def _init_reader(reader_class: type[Reader] | None, path: PathLike, internal_path: str) -> Reader:
+        if reader_class is None:
+            reader_class = deduce_reader_class(path)
+        return reader_class(path=path, internal_path=internal_path)
+    
         
     def _generate_tiles(self,
                         tileshape: TileShape | None
@@ -234,14 +402,14 @@ class TriaxialDataset(torchdata.Dataset):
         on input.
         
         Parameters
-        ==========
+        ----------
         
         tileshape: tuple[int, int, int] or None
             Desired tileshape. For `None`, the maximallly available
             tile volume is selected.
             
         Returns
-        =======
+        -------
         
         (tileshape, tiles) : tuple of TileShape and list[TileSlice]
             The actual tileshape and the slices that select the tiles
@@ -267,6 +435,10 @@ class TriaxialDataset(torchdata.Dataset):
     
     
     def _generate_orthoplanes(self) -> list[ArrayLike]:
+        """
+        Generate a single large list of all orthogonal planes from all
+        the tiles in the dataset.
+        """
         orthoplanes = []
         for tile in self.tiles:
             subvolume = np.squeeze(self.volume[tile])
@@ -278,11 +450,13 @@ class TriaxialDataset(torchdata.Dataset):
     
     @cached_property
     def label(self) -> int:
+        """Deduce the integer label of the class from the dataset fingerprint."""
         classname = self.fingerprint['class_']
         try:
             classvalue = self.classlabel_mapping[classname]
         except KeyError:
-            classvalue = self.classlabel_mapping[CLASSNAME_REMAP[classname]]
+            raise KeyError(f'could not assign integer class value to class name \'{classname}\' - '
+                           f'not found in classlabel mapping {self.classlabel_mapping.keys()}')
         return classvalue
 
 
@@ -306,6 +480,9 @@ class TriaxialDataset(torchdata.Dataset):
 
 
     def __len__(self) -> int:
+        """Number of elements in the dataset instance.
+        In this case, this is the number of orthogonal planes.
+        """
         return len(self.orthoplanes)
     
     def __str__(self) -> str:
@@ -324,23 +501,34 @@ class TriaxialDataset(torchdata.Dataset):
         return str(self)
 
 
-from woodnet.datasets.constants import DEFAULT_CLASSLABEL_MAPPING
-from woodnet.transformations.transformer import Transformer
-from woodnet.transformations.buildtools import from_configurations
-
-
-
 
 class TriaxialDatasetBuilder:
     """
     Build a 3D TileDataset programmatically.
 
     Thin class, basically acts as a namespace. Maybe move to module?
+
+    Attributes
+    ----------
+
+    instance_mapping : dict[str, InstanceFingerprint]
+        Mapping of instance IDs to instance fingerprints.
+        Utilized to retrieve the instance data via the set unqiue ID string.
+        The fingerprints must at least provide the location of
+        the instance data on disk.
+
+    internal_path : str
+        Internal path to the data inside the storage container.
+
+    classlabel_mapping : dict[str, int]
+        Mapping of class names to integer labels.
+
+    pretty_phase_name_map : dict[str, str]
+        Mapping of phase names to pretty-printable names.
     """
-    internal_path: str = 'downsampled/half'
-    classlabel_mapping: dict[str, int] = DEFAULT_CLASSLABEL_MAPPING
-    # TODO: factor hardcoded paths out -> bad!
-    base_directory: Path = Path('/home/jannik/storage/wood/custom/')
+    instance_mapping: dict[str, InstanceFingerprint] = INSTANCE_MAPPING
+    internal_path: str = INTERNAL_PATH
+    classlabel_mapping: dict[str, int] = CLASSLABEL_MAPPING
     pretty_phase_name_map = {'val' : 'validation', 'train' : 'training', 'test' : 'testing'}
 
     def build(cls,
@@ -351,7 +539,36 @@ class TriaxialDatasetBuilder:
               transform_configurations: Iterable[dict] | None = None,
               **kwargs
               ) -> list[TriaxialDataset]:
-        
+        """
+        Build the TriaxialDataset instances from the provided instance IDs.
+
+        Parameters
+        ----------
+
+        instances_ID : Iterable[str]
+            Iterable of instance IDs to build the datasets from. The IDs
+            must be present in the instance mapping.
+
+        phase : Literal['train', 'val', 'test']
+            Phase of the dataset: training, validation or testing.
+
+        tileshape : TileShape
+            Desired tileshape for the datasets.
+
+        planestride : tuple[int, int, int]
+            Stride along the three axes to generate the orthogonal planes.
+            Lower values generate more orthoplane elements.
+
+        transform_configurations : Iterable[dict] | None
+            Iterable of transformation configurations to apply to the
+            orthoplane elements. Defaults to None, i.e. no transformations.
+
+        Returns
+        -------
+
+        datasets : list[TriaxialDataset]
+            List of TriaxialDataset instances.
+        """
         datasets = []
         if transform_configurations:
             transformer = Transformer(
@@ -381,8 +598,10 @@ class TriaxialDatasetBuilder:
 
     @classmethod
     def get_path(cls, ID: str) -> Path:
-        for child in cls.base_directory.iterdir():
-            if child.match(f'*/{ID}*'):
-                return child
-        raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
-                                f'basedir "{cls.base_directory}"')
+        try:
+            fingerprint = cls.instance_mapping[ID]
+        except KeyError:
+            raise FileNotFoundError(f'could not retrieve dataset instance with ID "{ID}" - '
+                                    f'check if ID is present in the data configuration!')
+
+        return fingerprint.location
