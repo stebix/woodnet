@@ -96,6 +96,7 @@ class FixtureDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return self.length
 
+
 @pytest.fixture
 def loaders() -> dict[str, DataLoader]:
     train_loader = DataLoader(FixtureDataset(), batch_size=3, shuffle=True)
@@ -133,6 +134,12 @@ class Test_retrieve_trainer_class:
         expected_class = Trainer
         class_ = retrieve_trainer_class(name)
         assert class_ == expected_class
+
+
+    def test_with_invalid_name(self):
+        name = 'InvalidName'
+        with pytest.raises(ValueError):
+            retrieve_trainer_class(name)
 
 
 
