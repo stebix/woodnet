@@ -49,6 +49,7 @@ class ScoredCheckpoint:
             message = (f'attempted demotion of non-optimal instance '
                        f'with score rank of {self.rank}')
             logger.warning(message)
+            return
         
         try:
             demoted_filepath = excise_optimal_qualifier(self.filepath)
