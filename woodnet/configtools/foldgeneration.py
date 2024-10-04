@@ -26,7 +26,10 @@ logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 def set_instances_ID_mapping(configuration: dict,
                              training_instances: Iterable[str],
                              validation_instances: Iterable[str]) -> dict:
-    """Set the instance IDs of a raw configuration dictionary."""
+    """
+    Set the instance IDs of a raw top-level configuration dictionary.
+    Return a new dictionary.
+    """
     configuration = deepcopy(configuration)
     configuration['loaders']['train']['instances_ID'] = list(training_instances)
     configuration['loaders']['val']['instances_ID'] = list(validation_instances)
@@ -36,12 +39,15 @@ def set_instances_ID_mapping(configuration: dict,
 def set_instances_ID_validated(configuration: TrainingConfiguration,
                                training_instances: Iterable[str],
                                validation_instances: Iterable[str]) -> dict:
-    """Set the instance IDs of a validated configuration object."""
+    """
+    In-place set the instance IDs of a validated top-level configuration object.
+    """
     configuration.loaders.train.instances_ID = list(training_instances)
     configuration.loaders.val.instances_ID = list(validation_instances)
     return configuration
 
 
+# Dispatch table for set_instances_ID function depending on configuration type
 set_instances_ID_dispatcher: dict[type, Callable] = {
     Mapping : set_instances_ID_mapping,
     TrainingConfiguration : set_instances_ID_validated,

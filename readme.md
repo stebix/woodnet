@@ -6,6 +6,41 @@ How to insert custom data into the pipeline: [Data Loading](#data-loading)
 How to configure a training run: [Training Run Configuration](#training-run-configuration)
 
 
+## Getting Started
+
+### Installation
+
+To install the project into your local machine, first pull the repository to a location you desire.
+```bash
+cd /desired/location
+git pull https://github.com/stebix/woodnet.git
+```
+We recommend to install the package using some sort of virtual environment. For heavy deep-learning machinery with compiled/C/C++/CUDA components like PyTorch,
+we recommend using `conda` or the modern and faster sibling `mamba`. If you decide to use `mamba`, supplant the `conda` command with `mamba`.
+
+As a first step, create the environment from the provided `environment.yaml` file in the repository. This will preinstall all necessary dependencies.
+With the current working directory being the pulle repository, we can execute
+```bash
+conda env create -f environment.yaml
+```
+The default name for the newly created environment is `woodanalysis`. If we want another environment name, we can just modify the first line of the environment file.
+We than need to activate the environment and may inspect the correct installation of the required packages can be inspected via the `list` command.
+```bash
+conda activate woodanalysis
+conda env list
+```
+Of course, modifications to the envirnoment name have to be respected here.
+Then, we can install a local editable version of the package via `pip` using the command
+```bash
+pip install --editable .
+```
+Then the package is importable as any Python package for sessions started within this environment.
+
+>[!NOTE]
+> For future releases, we plan to switch to a full PyPI or anaconda package release. But currently, the above clone + install method is the recommended one!
+
+
+
 ## Data Loading
 
 The central place to inject data into the `woodnet` system is via the `dataconf.yaml` configuration file.
