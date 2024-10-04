@@ -1,4 +1,6 @@
-# woodnet readme
+# woodnet
+
+# Introduction
 
 ## Table of Content
 
@@ -41,6 +43,13 @@ Then the package is importable as any Python package for sessions started within
 > Any updates can be retrieved by navigating to the repository and pulling in the changes. Via the editable install, these are then directly available environment-wide.
 
 
+# Components
+
+In this section, we look at the different components of the model and data pipeline.
+We want to provide insights about possibilities to use and configure the pacakge.
+The main entry point for primary usage is the [data loading section](#data-loading) where instructions about injecting your data (e.g. scanned volumes, scanned planar images or microscopy data) into the system is provided.
+The following sections are concerned with explaining the configuration files
+to [control training experiments](#training-run-configuration) and performing prediction and evaluation tasks.
 
 ## Data Loading
 
