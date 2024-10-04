@@ -2,7 +2,7 @@ import enum
 import logging
 import numpy as np
 
-from collections.abc import Iterable, Mapping, Callable
+from collections.abc import Iterable, Mapping, Callable, Sequence
 from typing import Literal
 
 import sklearn.model_selection as skml
@@ -26,6 +26,12 @@ def process(orientation: str) -> str:
     elif 'transversal' in orientation:
         return 'transversal'
     raise ValueError(f'invalid orientation \'{orientation}\'')
+
+
+
+def remap_group(groups: Sequence[str], mapping: dict[str, str]) -> list[str]:
+    """Remap group names according to a mapping."""
+    return [mapping.get(g, g) for g in groups]
 
 
 def convert_to_multiclass(nested: dict[str, dict], /) -> dict:
