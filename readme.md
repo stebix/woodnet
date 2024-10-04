@@ -34,10 +34,11 @@ Then, we can install a local editable version of the package via `pip` using the
 ```bash
 pip install --editable .
 ```
-Then the package is importable as any Python package for sessions started within this environment.
+Then the package is importable as any Python package for sessions started within this environment 🎉
 
 >[!NOTE]
-> For future releases, we plan to switch to a full PyPI or anaconda package release. But currently, the above clone + install method is the recommended one!
+> For future releases, we plan to switch to a full PyPI and `anaconda` package release. But currently, the above clone + install method is the recommended one!
+> Any updates can be retrieved by navigating to the repository and pulling in the changes. Via the editable install, these are then directly available environment-wide.
 
 
 
