@@ -1,29 +1,77 @@
 import importlib
 import torch
 import logging
+from pathlib import Path
+from typing import Generator
 
 from collections.abc import Callable, Mapping
 from copy import deepcopy
-from typing import Type
+from typing import Type, Sequence
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
+# module filename prefix indicating custom contribution model module
+PREFIX: str = 'customcontrib_'
 
-def get_model_class(configuration: dict) -> Type[torch.nn.Module]:
-    """Retrieve model class by inferring name from the model config.
-    
+ModelClass = Type[torch.nn.Module]
+
+
+def collect_custom_model_modules(directory: Path) -> Generator[str, None, None]:
+    """
+    Collect custom contributed model modules via prefix-matching.
+    """
+    # we look for appropriately named modules in the models directory
+    logger.debug(f'Collecting custom model modules from \'{directory}\'')
+    for item in directory.iterdir():
+        if item.is_file() and item.name.startswith(PREFIX):
+            logger.debug(f'Found custom model module: {item}')
+            yield item.stem
+
+
+# this list holds the canonical model modules from which we can import via class name
+# through the YAML configuration workflow
+CANONICAL_MODEL_MODULES = [
+    'woodnet.models.planar', 'woodnet.models.volumetric',
+    *[
+        f'woodnet.models.{item}'
+        for item in list(collect_custom_model_modules(Path(__file__).parent))
+    ]
+]
+
+
+def get_model_class(configuration: dict,
+                    modules: Sequence[str] = CANONICAL_MODEL_MODULES) -> ModelClass:
+    """
+    Retrieve model class object by via string class name from the model config.
     Modifies model dictionary in-place. 
+
+    Parameters
+    ----------
+
+    configuration : dict
+        Model configuration dictionary. Must contain a 'name' key.
+
+    modules : Sequence[str]
+        Sequence of module names to search for the model class.
+
+
+    Returns
+    -------
+
+    model_class : ModelClass
+        Model class object.
     """
     name: str = configuration.pop('name')
-    module_names = ['woodnet.models.planar', 'woodnet.models.volumetric']
-    for module_name in module_names:
+    for module_name in modules:
         module = importlib.import_module(module_name)
         try:
-            return getattr(module, name)
+            model_class = getattr(module, name)
+            logger.debug(f'Retrieved model class {model_class} from module {module_name}')
+            return model_class
         except AttributeError:
             pass
-    raise ValueError(f'unrecognized mode name \'{name}\'')
+    raise ValueError(f'unrecognized model name \'{name}\'')
 
 
 
