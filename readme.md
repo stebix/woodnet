@@ -71,6 +71,9 @@ class_to_label_mapping:
 ```
 The second building block is the instance mapping part where we can specify the dataset instances
 as unique string IDs to use these IDs in other places (e.g. configurations and dataset builders).
+Another advantage of this central registration of datasets is the possibility to automatically
+split our datasets into disjoint training and validation sets and transform a training configuration 
+file correspondingly. For further information on cross validation functionality, head over to the small tutorial [chapter](#cross-validation-tooling). 
 The framework needs further information about the dataset instances, thus we need to specify
 more information for every ID. This leads to the following layout:
 ```yaml
@@ -298,6 +301,21 @@ Firstly, we have to compute features like mean and standard deviation differentl
 Secondly, the generation of synthetic data via augmentation is a beneficial procedure applied in the training phase. However, in the validation phase usually unaugmented data is utilized.  
 
 
+## Cross Validation Tooling
+
+Cross validation (CV) is a crucial technique for improving the reliability of our deep learning models, especially when we are working with limited data. In the small data regime, the hazard of our models to overfit or to succumb to selection bias, meaning they perform well on training data but poorly on unseen data, is relatively larger.
+Instead of training on just one split of the data, we divide our dataset into multiple "folds" and train the model multiple times, each time using a different fold as the validation set.
+This ensures that the model performance is assessed on a variety of data splits, reducing the risk of overfitting and over-optimistically evaluating the performance of our model.
+>[!NOTE] The CV experiment basically reduces to performing quite similar training experiments with different unique dataset element IDs in the training and validation section, i.e. *ceteris paribus*.
+> Thus, other (hyper-) parameters should be kept the same.  
+The `woodnet` machinery provides some convenience tools to quickly perform cross validation for our training experiments to mitigate tedious manual editing and potential errors.
+The training-validation split can be performed with on of two currently supported splitting techniques:
+
+- Stratified `k`-fold cross-validation is a variation of `k`-fold cross-validation that ensures each fold preserves the proportion of classes in the original dataset. In standard `k`-fold, the data is randomly split into `k` subsets, or folds, which can result in an uneven distribution of class labels in each fold, particularly in imbalanced datasets. Stratified `k`-fold addresses this by ensuring that each fold has a representative balance of classes, similar to the overall dataset.
+
+- Stratified group `k`-fold cross-validation is an extension of stratified `k`-fold designed for scenarios where data is grouped into clusters or subsets. It combines stratification, ensuring that each fold maintains the class distribution, with group partitioning, ensuring that all data from a particular group appears in only one fold.
+
+For a detailed and graphical explanation of both approaches, we can also consult the excellent `scikit-learn` [user guide](https://scikit-learn.org/stable/modules/cross_validation.html#cross-validation-iterators-with-stratification-based-on-class-labels). The implementation is also based on this.
 
 ## Custom Models
 

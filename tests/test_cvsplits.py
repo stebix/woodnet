@@ -36,4 +36,4 @@ def test():
 
     generator = StratifiedKFoldsGenerator()
 
-    rich.print(generator[0])
+    rich.print(generator[1])
