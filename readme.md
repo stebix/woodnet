@@ -44,10 +44,50 @@ This installation process also allows you to use the package or parts of it as a
 > Any updates can be retrieved by navigating to the repository and pulling in the changes. Via the editable install, these are then directly available environment-wide.
 
 
+# Usage
+
+Here we will learn how to use the core functionality of the `woodnet` pipeline as a (command line) tool to perform training experiments and make predictions and evaluations with trained models.
+If we are more interested in using parts of the code as a library, then the documentation [TODO: INSERT LINK] over here might be more appropriate.
+
+## Run Training Experiment
+
+The necessary prerequisites for smoothly running a training experiment is a valid data loading setup (the system must know ehere to find our training end evaluation data) and a training configuration file
+(the system must know the precise parameters for the manifold numbers of settings present fro a deep learning experiment).
+If we set up our training experiment configuration with all necessary [components](#components) at a location of our choice, we can run the task via the command line invocation
+```bash
+net train /path/to/training-configuration.yaml
+```
+Then the training starts and runs according to your settings. Keep the terminal open and check for progress reporting via progress bars. 
+
+
+## Run Evaluation Experiment
+
+To thoroughly evaluate an experiment with cross validation, we can use the CLI tooling again.
+Here, it is necessary the the experiment directory layout is canonical like so:
+```
+experiment-basedir/
+├── fold-1/
+│ |── logs/
+| |-- checkpoints/
+├── fold-2/
+│ |── logs/
+| |-- checkpoints/
+├── fold-N/
+│ |── logs/
+| |-- checkpoints/
+```
+For such a training experiment result, we can run the full evaluation again via CLI via
+```bash
+net evaluate /path/to/experiment-basedir transform-template 
+```
+The second argument is the template name (name for builtin, path for template file anywhere on the system) specifying the transformations to use for the robustness evaluation.
+Then the system will perform predictions and evaluate all models of all folds with all transformations applied to the input data and aggregate the results in an inference directory created on the level of the `fold-N` directories.
+
+
 # Components
 
 In this section, we look at the different components of the model and data pipeline.
-We want to provide insights about possibilities to use and configure the pacakge.
+We want to provide insights about possibilities to configure the pacakge.
 The main entry point for primary usage is the [data loading section](#data-loading) where instructions about injecting your data (e.g. scanned volumes, scanned planar images or microscopy data) into the system is provided.
 The following sections are concerned with explaining the configuration files
 to [control training experiments](#training-run-configuration) and performing prediction and evaluation tasks.
@@ -340,7 +380,12 @@ may lead to errors. Thusly pick an unique model class name.
 The presented pipeline implementation could serve in different to the wood science community.
 Firstly, the implementation could be adopted as a purpose-built template to inject **custom CT data** of wood samples to gauge classification performance for this specific dataset.
 Furthermore, adoption to **light microscopic** datasets is easily conceivable since a fully planar 2D formulation is included in the package.
-Also, usage with **multiplanar microscopic** images is possible. For this, the triaxial formulation with a preset ordering for the typical wood anatomic cross sections may be appropriate. 
+Also, usage with **multiplanar microscopic** images is possible. For this, the triaxial formulation with a preset ordering for the typical wood anatomic cross sections may be appropriate.
+
+### Bugs, Questions, Requests and Contributions
+
+If you find bugs or have general questions please do not hesitate to open an issue. We will gladly try to answer and improve the pipeline.
+Also, we would be happy to include feature requests or use cases if they are within the general scope of our pipeline. For this, also head over to the repository issues tab and open with label `enhancement`! 🧰 
 
 
 ## About
