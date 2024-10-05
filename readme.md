@@ -48,6 +48,8 @@ This installation process also allows you to use the package or parts of it as a
 
 Here we will learn how to use the core functionality of the `woodnet` pipeline as a (command line) tool to perform training experiments and make predictions and evaluations with trained models.
 If we are more interested in using parts of the code as a library, then the documentation [TODO: INSERT LINK] over here might be more appropriate.
+> [!WARNING]
+> Please note however that the intended use for the `woodnet` framework and pipeline is still in flux and we intend to adapt substantially to own further work and community wishes. So please do not count too much on API stability (yet).
 
 ## Run Training Experiment
 
