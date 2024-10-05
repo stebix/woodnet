@@ -306,8 +306,11 @@ Secondly, the generation of synthetic data via augmentation is a beneficial proc
 Cross validation (CV) is a crucial technique for improving the reliability of our deep learning models, especially when we are working with limited data. In the small data regime, the hazard of our models to overfit or to succumb to selection bias, meaning they perform well on training data but poorly on unseen data, is relatively larger.
 Instead of training on just one split of the data, we divide our dataset into multiple "folds" and train the model multiple times, each time using a different fold as the validation set.
 This ensures that the model performance is assessed on a variety of data splits, reducing the risk of overfitting and over-optimistically evaluating the performance of our model.
-> [!NOTE] The CV experiment basically reduces to performing quite similar training experiments with different unique dataset element IDs in the training and validation section, i.e. *ceteris paribus*.
+
+> [!NOTE] 
+> The CV experiment basically reduces to performing quite similar training experiments with different unique dataset element IDs in the training and validation section, i.e. *ceteris paribus*.
 > Thus, other (hyper-) parameters should be kept the same.  
+
 The `woodnet` machinery provides some convenience tools to quickly perform cross validation for our training experiments to mitigate tedious manual editing and potential errors.
 The training-validation split can be performed with on of two currently supported splitting techniques:
 
