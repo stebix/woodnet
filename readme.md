@@ -141,20 +141,25 @@ The device option lets us choose the device on which we want to perform the trai
 ### Model Block
 
 In the model block, we configure our core deep learning model.
-In genreal, we can set all user-facing parameters in the initializer (i.e. `__init__` method) of the model class here. Additionally, model ahead-of-time (AOT) and just-in-time (JIT) compilation
-flags can be set here. For more information on AOT and JIT-functionality via `torch.compile` please consider the [PyTorch docs](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html).
+In general, we can set all user-facing parameters in the initializer (i.e. `__init__` method) of the model class here. Additionally, model ahead-of-time (AOT) and just-in-time (JIT) compilation
+flags can be set here in the optional `compile` subconfiguration. For more information on AOT and JIT-functionality via `torch.compile` please consider the [PyTorch docs](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html).
 A typical model block may look like this:
 ```yaml
 model:
-  name: ResNet3D
+  name: ResNet3D          # model class and settings go here
   in_channels: 1
-  compile:
-    enabled: True
+  compile:                # optional model compilation settings
+    enabled: True         # using this can speed up training and prediction tasks
     dynamic: False
     fullgraph: False
 ```
-In this example, we selected the `ResNet3D` from our model zoo and configured it to have a single input channel. Single channel data is typical for monochromatic computed tomography data. For light microscopy data, we may encounter multi channel data due to the separate measurement of red, green and blue intensity (RGB) in a photographic sensor.
-We also set the model compilation flag. Thusly, the model will be compiled at the first iteration at the cost of a small, singular latency increase and the benefit of substantial acceleration during following iterations.
+In this example, we selected the `ResNet3D` from our model zoo and configured it to have a single input channel. Single channel data is typical for monochromatic computed tomography data. For light microscopy data, we may encounter multi channel data due to the separate measurement of red, green and blue intensities (RGB) in a photographic sensor.
+We also (optionally) set the model compilation flag. In the above example, the model will be compiled at the first iteration at the cost of a small, singular latency increase and the benefit of substantial acceleration during following iterations.
+>[!TIP]
+> If we want to use custom model implementations, we can inject implementations into the package
+> or modify files.
+> So if another architecture is needed, we can head over to the section on injecting custom models.
+> We also plan to support more models directly in the future 🚀
 
 
 ### Optimizer Block
@@ -291,6 +296,22 @@ val:
 Usually, the transformations applied to the validation data elements differ from the training data transformations.
 Firstly, we have to compute features like mean and standard deviation differently for every subset to avoid premature feature engineering.
 Secondly, the generation of synthetic data via augmentation is a beneficial procedure applied in the training phase. However, in the validation phase usually unaugmented data is utilized.  
+
+
+
+## Custom Models
+
+If we want to utilize models not currently implemented in the package, we can inject the custom model implementations via two approaches.
+The first approach is to directly modify the two core model files, e.g. `woodnet.models.planar` or
+`woodnet.models.volumetric` such that they contain our new model implementation. This allows direct instantiation via the YAML-configuration file workflow. A drawback would be, that git merge conflicts might arise when pulling new updates from the remote repository. Also, poorer code structuring due to mixing of origins/concerns would be in effect.
+The second option works by copying your implementation file into the `woodnet.models` submodule of the full package.
+In practice, we can just put our custom model implementation inside a separate Python module (i.e. a `/py` file).
+> [!IMPORTANT]
+>  The file should use an approriate name with the indication prefix `customcontrib_$DESIREDNAME.py`, where the prefix with the trailing underscore `customcontrib_` should matched exactly.
+Then, we can copy this module to the `woodnet.models` submodule and use the custom model via the YAML configuration file workflow.
+The custom model implementation modules are then collected via a filename matching scheme and are available for the name-based instantiation logic.
+Note that when we create models from the configuration, the first model class with a matching name is used. If we implement custom models with the same name as already implemented model, name shadowing
+may lead to errors. Thusly pick an unique model class name.
 
 
 ## Further Usage Ideas
