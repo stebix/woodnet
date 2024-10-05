@@ -158,7 +158,7 @@ We also (optionally) set the model compilation flag. In the above example, the m
 >[!TIP]
 > If we want to use custom model implementations, we can inject implementations into the package
 > or modify files.
-> So if another architecture is needed, we can head over to the section on injecting custom models.
+> So if another architecture is needed, we can head over to the section on injecting [custom models](#custom-models).
 > We also plan to support more models directly in the future 🚀
 
 
@@ -305,9 +305,9 @@ If we want to utilize models not currently implemented in the package, we can in
 The first approach is to directly modify the two core model files, e.g. `woodnet.models.planar` or
 `woodnet.models.volumetric` such that they contain our new model implementation. This allows direct instantiation via the YAML-configuration file workflow. A drawback would be, that git merge conflicts might arise when pulling new updates from the remote repository. Also, poorer code structuring due to mixing of origins/concerns would be in effect.
 The second option works by copying your implementation file into the `woodnet.models` submodule of the full package.
-In practice, we can just put our custom model implementation inside a separate Python module (i.e. a `/py` file).
+In practice, we can just put our custom model implementation inside a separate Python module (i.e. a `.py` file).
 > [!IMPORTANT]
->  The file should use an approriate name with the indication prefix `customcontrib_$DESIREDNAME.py`, where the prefix with the trailing underscore `customcontrib_` should matched exactly.
+>  The file should use an appropriate name with the indication prefix `customcontrib_$DESIREDNAME.py`, where the prefix with the trailing underscore `customcontrib_` must be used exactly.
 Then, we can copy this module to the `woodnet.models` submodule and use the custom model via the YAML configuration file workflow.
 The custom model implementation modules are then collected via a filename matching scheme and are available for the name-based instantiation logic.
 Note that when we create models from the configuration, the first model class with a matching name is used. If we implement custom models with the same name as already implemented model, name shadowing
