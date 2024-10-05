@@ -1,10 +1,56 @@
+import sys
 import torch
 
 import pytest
 
-from woodnet.models import create_model
+from woodnet.models import (create_model, collect_custom_model_modules,
+                            get_model_class, CANONICAL_MODEL_MODULES)
 from woodnet.models.planar import ResNet18
 from woodnet.models.volumetric import ResNet3D
+
+
+
+
+def test_collect_custom_model_modules(tmp_path):
+    # create dummy custom module files and dummy __init__.py file
+    dummy_files = [
+        tmp_path / 'dummy.py',
+        tmp_path / 'customcontrib_dummy1.py',
+        tmp_path / 'customcontrib_dummy2.py',
+        tmp_path / 'falseprefix_dummy3.py'
+    ]
+    for file in dummy_files:
+        file.write_text('dummy content')
+
+    custom_modules = list(collect_custom_model_modules(tmp_path))
+    assert set(custom_modules) == {'customcontrib_dummy1', 'customcontrib_dummy2'}
+    
+
+
+def test_get_model_from_custom_module(tmp_path):
+    # create dummy custom module files and dummy __init__.py file
+    dummy1_content = 'class ModelDummy1_Picard:\n    pass'
+    dummy2_content = 'class ModelDummy2_Sisko:\n    pass'
+    
+    dmod1 = tmp_path / 'customcontrib_dummy1.py'
+    dmod2 = tmp_path / 'customcontrib_dummy2.py'
+
+    with dmod1.open('w') as f:
+        f.write(dummy1_content)
+    with dmod2.open('w') as f:
+        f.write(dummy2_content)
+
+    # hack to add the temporary path to the module search path
+    sys.path.append(str(tmp_path))
+
+    modules = [
+        *CANONICAL_MODEL_MODULES,
+        *[elem.stem for elem in (dmod1, dmod2)]
+    ]
+    conf1 = {'name' : 'ModelDummy1_Picard'}
+    model_class1 = get_model_class(conf1, modules=modules)
+    assert model_class1.__name__ == 'ModelDummy1_Picard'
+
 
 
 def test_2D_ResNet18_via_create_model():
