@@ -67,21 +67,26 @@ Here, it is necessary the the experiment directory layout is canonical like so:
 ```
 experiment-basedir/
 ├── fold-1/
-│ |── logs/
+│ |-- logs/
 | |-- checkpoints/
 ├── fold-2/
-│ |── logs/
+│ |-- logs/
 | |-- checkpoints/
 ├── fold-N/
-│ |── logs/
+│ |-- logs/
 | |-- checkpoints/
+|--- inference/         # newly created for inference run
+│ |-- timestamp-1/
+| |-- timestamp-2/
 ```
 For such a training experiment result, we can run the full evaluation again via CLI via
 ```bash
 net evaluate /path/to/experiment-basedir transform-template 
 ```
 The second argument is the template name (name for builtin, path for template file anywhere on the system) specifying the transformations to use for the robustness evaluation.
-Then the system will perform predictions and evaluate all models of all folds with all transformations applied to the input data and aggregate the results in an inference directory created on the level of the `fold-N` directories.
+Then the system will perform predictions and evaluate all models (could be many due to the sampling/saving of model states) of all folds (determined by our CV strategy) with all transformations (set in the transform template) applied to the input data and aggregate the results in an inference directory created on the level of the `fold-N` directories.
+For every evaluation run, a new subdirectory with the timestamp of the run is created.
+We can then process, analyse and visualize the aggregated performance metrics to gain insights over model performance and potential performance degradation for input data transformation.
 
 
 # Components
