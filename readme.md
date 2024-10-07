@@ -47,6 +47,18 @@ This installation process also allows you to use the package or parts of it as a
 # Usage
 
 Here we will learn how to use the core functionality of the `woodnet` pipeline as a (command line) tool to perform training experiments and make predictions and evaluations with trained models.
+After successful installation, the package provides you with three command lins tools: `net`, `refolder` and `benchmark` that can be directly accessed from the environment and shell the `woodnet` package is installed to.
+The basic syntax is as follows:
+```bash
+net [VERB] [ARGS]
+```
+The available verbs are:
+- ``train`` : Run a single training experiment configured via a YAML file.
+- ``batchtrain`` : Run multiple training experiments sequentially (multiple YAML files)
+- ``predict`` : Run a single prediction task configured via a YAML file.
+- ``evaluate`` : Evaluate and aggregate over multiple training experiments in the context of cross validation.
+For the core of the verbs, i.e. ``train``, ``batchtrain`` and ``predict``, simply a configuration file is required.
+
 If we are more interested in using parts of the code as a library, then the documentation [TODO: INSERT LINK] over here might be more appropriate.
 > [!WARNING]
 > Please note however that the intended use for the `woodnet` framework and pipeline is still in flux and we intend to adapt substantially to own further work and community wishes. So please do not count too much on API stability (yet).
