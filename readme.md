@@ -425,7 +425,7 @@ Also, we would be happy to include feature requests or use cases if they are wit
 ### Acknowledgements
 
 See e.g. our citations and literature in the paper manuscript.
-Also many thanks to the incredible global open-source community and its fruits of labor, i.e. the dependencies crucial to this implementation:
+Also many thanks to the incredible global open-source community and its fruits of labor ❤️ i.e. the dependencies crucial to this implementation:
 Python, PyTorch, monai, pytest, sphinx, and many more!
 
 ## About
