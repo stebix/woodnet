@@ -1,0 +1,50 @@
+[
+    {
+    "name" : "Identity",
+    "class_name" : "Identity",
+    "parameters" : [{}]
+    },
+    {
+    "name" : "GaussianSmooth",
+    "class_name" : "GaussianSmooth",
+    "parameters" : [
+        {"sigma" : 1.0},
+        {"sigma" : 2.0},
+        {"sigma" : 3.0},
+        {"sigma" : 4.0}
+    ]
+    },
+    {
+    "name" : "GaussianNoise",
+    "class_name" : "GaussianNoise",
+    "parameters" : [
+        {"std" : 0.1, "mean" : 0.0, "p_execution" : 1.0},
+        {"std" : 0.3, "mean" : 0.0, "p_execution" : 1.0},
+        {"std" : 0.5, "mean" : 0.0, "p_execution" : 1.0},
+        {"std" : 0.9, "mean" : 0.0, "p_execution" : 1.0},
+        {"std" : 1.25, "mean" : 0.0, "p_execution" : 1.0}
+    ]
+    },
+    {
+    "name" : "GibbsNoise",
+    "class_name" : "GibbsNoise",
+    "parameters" : [
+        {"alpha" : 0.1},
+        {"alpha" : 0.3},
+        {"alpha" : 0.5},
+        {"alpha" : 0.7},
+        {"alpha" : 0.9}
+    ]
+    },
+    {
+    "name" : "PoissonNoise",
+    "class_name" : "PoissonNoise",
+    "parameters" : [
+        {"lambda_" : 0.1, "p_execution" : 1.0},
+        {"lambda_" : 0.3, "p_execution" : 1.0},
+        {"lambda_" : 0.6, "p_execution" : 1.0},
+        {"lambda_" : 0.9, "p_execution" : 1.0},
+        {"lambda_" : 1.25, "p_execution" : 1.0}
+    ]
+    }
+]
