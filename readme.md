@@ -53,7 +53,7 @@ If we are more interested in using parts of the code as a library, then the docu
 
 ## Run Training Experiment
 
-The necessary prerequisites for smoothly running a training experiment is a valid data loading setup (the system must know ehere to find our training end evaluation data) and a training configuration file
+The necessary prerequisites for smoothly running a training experiment is a valid data loading setup (the system must know here to find our training end evaluation data) and a training configuration file
 (the system must know the precise parameters for the manifold numbers of settings present fro a deep learning experiment).
 If we set up our training experiment configuration with all necessary [components](#components) at a location of our choice, we can run the task via the command line invocation
 ```bash
