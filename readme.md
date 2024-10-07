@@ -25,6 +25,11 @@ With the current working directory being the pulle repository, we can execute
 ```bash
 conda env create -f environment.yaml
 ```
+> [!NOTE]
+> This installation tutorial assumes that you have a GPU installed. If this is not
+> the case you may want to switch to CPU-only Pytorch. For this, just follow the CPU-wise instructons for your platform from the [official documentation](https://pytorch.org/)
+> For Linux and conda, this amounts to an installation using the `cpuonly` metapackage like so `conda install pytorch torchvision torchaudio cpuonly -c pytorch`
+
 The default name for the newly created environment is `woodanalysis`. If we want another environment name, we can just modify the first line of the environment file.
 We than need to activate the environment and may inspect the correct installation of the required packages can be inspected via the `list` command.
 ```bash
