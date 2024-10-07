@@ -31,7 +31,7 @@ We than need to activate the environment and may inspect the correct installatio
 conda activate woodanalysis
 conda env list
 ```
-Of course, modifications to the envirnoment name have to be respected here.
+Of course, modifications to the environment name have to be respected here.
 Then, we can install a local editable version of the package via `pip` using the command
 ```bash
 pip install --editable .
