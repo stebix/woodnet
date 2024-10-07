@@ -193,6 +193,11 @@ The device option lets us choose the device on which we want to perform the trai
 In the model block, we configure our core deep learning model.
 In general, we can set all user-facing parameters in the initializer (i.e. `__init__` method) of the model class here. Additionally, model ahead-of-time (AOT) and just-in-time (JIT) compilation
 flags can be set here in the optional `compile` subconfiguration. For more information on AOT and JIT-functionality via `torch.compile` please consider the [PyTorch docs](https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html).
+> [!CAUTION]
+> The very useful compilation functionality is currently sadly not 
+> supported under Windows. This is caused by the underlying `triton` compiler backend. See e.g. in the [GitHub issue](https://github.com/pytorch/pytorch/issues/122094).
+> A fix/upgrade might however be released soon 🤞
+Back to specifying our deep learning model.
 A typical model block may look like this:
 ```yaml
 model:
