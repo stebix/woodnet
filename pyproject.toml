@@ -1,0 +1,55 @@
+# build and installation instructions for woodnet
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "woodnet"
+version = "0.0.1"
+authors = [
+  { name="Jannik Stebani", email="jannik.stebani@uni-wuerzburg.de" },
+]
+description = "Data processing and deep learning classification pipeline for wood scientific applications. "
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta"
+]
+license = {file = "LICENSE.txt"}
+keywords = [
+    "deep learning", "wood science", "volumetric", "classification",
+    "image processing", "machine learning", "data processing"]
+
+dependencies = [
+  "numpy",
+  "torch",
+  "pandas",
+  "matplotlib",
+  "seaborn",
+  "zarr",
+  "h5py",
+  "tqdm",
+  "tensorboard",
+  "rich",
+  "scikit-learn",
+  "scikit-image",
+  "pydantic",
+  "pillow",
+  "pytest",
+  "ruamel.yaml"
+]
+
+[project.scripts]
+net = "woodnet.net:main"
+refolder = "woodnet.refolder:main"
+benchmark = "woodnet.benchmark:main"
+
+[project.urls]
+Homepage = "https://github.com/stebix/wn-companiontools/"
+Issues = "https://github.com/stebix/wn-companiontools/issues"
