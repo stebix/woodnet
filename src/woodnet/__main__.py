@@ -1,7 +1,9 @@
-"""
-Entry point for package invocation with `python -m woodnet`.
-"""
-from woodnet.net import main
+import rich
+from woodnet.datasets.setup import INSTANCE_MAPPING
+
+def main_info():
+    rich.print(INSTANCE_MAPPING)
+
 
 if __name__ == '__main__':
-    main()
+    main_info()
