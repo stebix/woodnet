@@ -39,6 +39,7 @@ dependencies = [
   "rich",
   "scikit-learn",
   "scikit-image",
+  "monai",
   "pydantic",
   "pillow",
   "pytest",
