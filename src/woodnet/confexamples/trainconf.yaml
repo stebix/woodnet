@@ -1,0 +1,58 @@
+# test training configuration
+experiment_directory: /home/jannik/storage/trainruns-wood-volumetric/base/fold-1
+device: cuda:1
+
+model:
+  name: ResNet3D
+  in_channels: 1
+  compile:
+    enabled: True
+    dynamic: False
+    fullgraph: False
+
+
+optimizer:
+  name: Adam
+  learning_rate: 1e-3
+
+
+loss:
+  name: BCEWithLogitsLoss
+  reduction: mean
+
+
+trainer:
+  name: Trainer
+  log_after_iters: 1000
+  validate_after_iters: 2500
+  max_num_epochs: 500
+  max_num_iters: 175000
+  validation_metric: ACC
+  validation_metric_higher_is_better: True
+
+
+loaders:
+  dataset: TileDataset
+  tileshape: [256, 256, 256]
+  batchsize: 2
+  num_workers: 0
+  pin_memory: True
+
+  train:
+    instances_ID: [CT13, CT3, CT5, CT7, CT6, CT8, CT2, CT14, CT11, CT10]
+
+    transform_configurations:
+      - name: Normalize3D
+        mean: 110
+        std: 950
+   
+
+  val:
+    instances_ID: [CT9, CT12, CT20, CT21, CT22, CT16, CT17, CT18, CT19]
+
+    transform_configurations:
+      - name: Normalize3D
+        mean: 110
+        std: 950
+
+

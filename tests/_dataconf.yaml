@@ -1,0 +1,88 @@
+class_to_label_mapping:
+  acer : 0
+  pinus : 1
+
+instance_mapping :
+  CT2:
+    location: '/home/jannik/storage/wood/custom/CT2.zarr'
+    classname : acer
+    group : transversal
+  CT10:
+    location: '/home/jannik/storage/wood/custom/CT10.zarr'
+    classname : acer
+    group : transversal
+  CT11:
+    location: '/home/jannik/storage/wood/custom/CT11.zarr'
+    classname : acer
+    group : transversal
+  CT12:
+    location: '/home/jannik/storage/wood/custom/CT12.zarr'
+    classname : acer
+    group : transversal
+  CT13:
+    location: '/home/jannik/storage/wood/custom/CT13.zarr'
+    classname : acer
+    group : transversal
+  CT14:
+    location: '/home/jannik/storage/wood/custom/CT14.zarr'
+    classname : acer
+    group : transversal
+  CT16:
+    location: '/home/jannik/storage/wood/custom/CT16.zarr'
+    classname : acer
+    group : axial-tangential
+  CT17:
+    location: '/home/jannik/storage/wood/custom/CT17.zarr'
+    classname : acer
+    group : axial-tangential
+  CT19:
+    location: '/home/jannik/storage/wood/custom/CT19.zarr'
+    classname : acer
+    group : axial-tangential
+  CT18:
+    location: '/home/jannik/storage/wood/custom/CT18.zarr'
+    classname : acer
+    group : axial-tangential
+  CT3:
+    location: '/home/jannik/storage/wood/custom/CT3.zarr'
+    classname : pinus
+    group : transversal
+  CT5:
+    location: '/home/jannik/storage/wood/custom/CT5.zarr'
+    classname : pinus
+    group : transversal
+  CT6:
+    location: '/home/jannik/storage/wood/custom/CT6.zarr'
+    classname : pinus
+    group : transversal
+  CT7:
+    location: '/home/jannik/storage/wood/custom/CT7.zarr'
+    classname : pinus
+    group : transversal
+  CT8:
+    location: '/home/jannik/storage/wood/custom/CT8.zarr'
+    classname : pinus
+    group : transversal
+  CT9:
+    location: '/home/jannik/storage/wood/custom/CT9.zarr'
+    classname : pinus
+    group : transversal
+  CT15:
+    location: '/home/jannik/storage/wood/custom/CT15.zarr'
+    classname : pinus
+    group : axial
+  CT20:
+    location: '/home/jannik/storage/wood/custom/CT20.zarr'
+    classname : pinus
+    group : axial
+  CT21:
+    location: '/home/jannik/storage/wood/custom/CT21.zarr'
+    classname : pinus
+    group : axial
+  CT22:
+    location: '/home/jannik/storage/wood/custom/CT22.zarr'
+    classname : pinus
+    group : axial
+
+
+internal_path: 'downsampled/half'

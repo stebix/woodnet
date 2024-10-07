@@ -3,8 +3,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# project-specific benchmark results
+benchresults/
+
 # VS code stuff
 .vscode/
+
+# documetation build
+**/_build/
 
 # C extensions
 *.so
