@@ -1,0 +1,27 @@
+name: woodanalysis
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+
+dependencies:
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.4
+  - numpy
+  - tqdm
+  - matplotlib
+  - pandas
+  - scikit-learn
+  - scikit-image
+  - zarr
+  - h5py
+  - tensorboard
+  - seaborn
+  - rich
+  - monai
+  - pydantic
+  - pillow
+  - pytest
+  - ruamel.yaml
