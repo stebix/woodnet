@@ -398,8 +398,9 @@ The custom model implementation modules are then collected via a filename matchi
 Note that when we create models from the configuration, the first model class with a matching name is used. If we implement custom models with the same name as already implemented model, name shadowing
 may lead to errors. Thusly pick an unique model class name.
 
+## Miscellaneous
 
-## Further Usage Ideas
+### Further Usage Ideas
 
 The presented pipeline implementation could serve in different to the wood science community.
 Firstly, the implementation could be adopted as a purpose-built template to inject **custom CT data** of wood samples to gauge classification performance for this specific dataset.
@@ -411,8 +412,13 @@ Also, usage with **multiplanar microscopic** images is possible. For this, the t
 If you find bugs or have general questions please do not hesitate to open an issue. We will gladly try to answer and improve the pipeline.
 Also, we would be happy to include feature requests or use cases if they are within the general scope of our pipeline. For this, also head over to the repository issues tab and open with label `enhancement`! 🧰 
 
+### Acknowledgements
+
+See e.g. our citations and literature in the paper manuscript.
+Also many thanks to the incredible global open-source community and its fruits of labor, i.e. the dependencies crucial to this implementation:
+Python, PyTorch, monai, pytest, sphinx, and many more!
 
 ## About
 
 Author Jannik Stebani. Released under the MIT license.
-Accompanying manuscript: TODO:INSERT
+Accompanying manuscript: TODO:INSERT by Jannik Stebani, Tim Lewandrowski, Kilian Dremel and Simon Zabler
