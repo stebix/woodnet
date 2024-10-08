@@ -6,7 +6,7 @@ build:
     python: "mambaforge-latest"
 
 conda:
-  environment: environment-cpu.yaml
+  environment: docs/environment-cpu.yaml
 
 sphinx:
   configuration: docs/conf.py
