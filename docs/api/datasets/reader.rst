@@ -9,5 +9,32 @@ Currently, the readers for Zarr arrays and HDF5 files are implemented. If you wa
 support your special use case (e.g. directories, pickled files, etc.), you can
 either raise a feature request or implement an appropriate reader class here.
 
-.. automodule:: woodnet.datasets.reader
-    :members:	
+The reader class is expected to conform to the following interface:
+
+.. autoclass:: woodnet.datasets.reader.Reader
+    :members:
+
+
+We provide the premade readers for {``zarr``, ``hdf5``} raw data formats.
+Both require a path to the file or directory containing the raw data and an
+internal path specification to the data within the file.
+This allows the bundling of multiple versions of the same dataset in a single file.
+
+.. automodule:: woodnet.datasets.reader.zarr
+    :members:
+
+.. automodule:: woodnet.datasets.reader.hdf5
+    :members:
+
+.. automodule:: woodnet.datasets.reader.deduce_reader_class
+    :members:
+
+.. autofunction:: woodnet.datasets.reader.read_data_from_hdf5
+
+.. autofunction:: woodnet.datasets.reader.read_data_from_zarr
+
+.. autofunction:: woodnet.datasets.reader.read_fingerprint_from_hdf5
+
+.. autofunction:: woodnet.datasets.reader.read_fingerprint_from_zarr
+
+ 
