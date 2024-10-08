@@ -79,9 +79,10 @@ The available verbs are:
 
 For the core of the verbs, i.e. ``train``, ``batchtrain`` and ``predict``, simply a configuration file is required. For this, see the corresponding [sections](#run-training-experiment).
 The ``evaluate`` verb requires more arguments, namely the indication of the basal training experiment directory where the differnt fold-wise subexperiments live.
-For this, look [here](#run-evaluation-experiment) or consult the detailed CLI documentation [TODO INSERT DOC LINKS].
+For this, look [here](#run-evaluation-experiment) or consult the detailed CLI documentation
+at [`woodnet CLI documentation`](https://woodnet.readthedocs.io/en/latest/usage.html).
 
-If we are more interested in using parts of the code as a library, then the documentation [TODO: INSERT LINK] over here might be more appropriate.
+If we are more interested in using parts of the code as a library, then the documentation [API reference](https://woodnet.readthedocs.io/en/latest/api/modules.html) over there might be more appropriate.
 > [!WARNING]
 > Please note however that the intended use for the `woodnet` framework and pipeline is still in flux and we intend to adapt substantially to own further work and community wishes. So please do not count too much on API stability (yet).
 
