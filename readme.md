@@ -2,6 +2,10 @@
 
 [![Documentation Status](https://readthedocs.org/projects/woodnet/badge/?version=latest)](https://woodnet.readthedocs.io/en/latest/?badge=latest)
 
+ [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+
 # Introduction
 
 Welcome to the `woodnet` repository. This code infrastructure arose as part of the project to further establish
