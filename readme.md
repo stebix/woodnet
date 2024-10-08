@@ -1,5 +1,7 @@
 # woodnet
 
+[![Documentation Status](https://readthedocs.org/projects/woodnet/badge/?version=latest)](https://woodnet.readthedocs.io/en/latest/?badge=latest)
+
 # Introduction
 
 Welcome to the `woodnet` repository. This code infrastructure arose as part of the project to further establish
