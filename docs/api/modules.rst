@@ -7,6 +7,7 @@ API Reference
    datasets/planar
    datasets/volumetric
    datasets/triaxial
+   datasets/reader
 
    trainer/trainer
 
