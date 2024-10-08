@@ -1,5 +1,5 @@
 # This environment file is intended for the build process at readthedocs.io.
-# It hsould be kept in close sync with the environment file in the parent
+# It should be kept in close sync with the environment file in the parent
 # directory, environment.yaml, which is intended for local development.
 # Here, we also specify the sphinx-specific packages that are mostly pip-only
 name: woodanalysis
