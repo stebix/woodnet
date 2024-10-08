@@ -20,14 +20,13 @@ Both require a path to the file or directory containing the raw data and an
 internal path specification to the data within the file.
 This allows the bundling of multiple versions of the same dataset in a single file.
 
-.. automodule:: woodnet.datasets.reader.zarr
+.. autoclass:: woodnet.datasets.reader.HDF5Reader
     :members:
 
-.. automodule:: woodnet.datasets.reader.hdf5
+.. autoclass:: woodnet.datasets.reader.ZarrReader
     :members:
 
-.. automodule:: woodnet.datasets.reader.deduce_reader_class
-    :members:
+.. autofunction:: woodnet.datasets.reader.deduce_reader_class
 
 .. autofunction:: woodnet.datasets.reader.read_data_from_hdf5
 
@@ -37,4 +36,3 @@ This allows the bundling of multiple versions of the same dataset in a single fi
 
 .. autofunction:: woodnet.datasets.reader.read_fingerprint_from_zarr
 
- 
