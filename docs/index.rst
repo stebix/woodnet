@@ -17,10 +17,10 @@ Who
 ----
 
 This code infrastructure arose as part of a research project between the
-[Fraunhofer EZRT](https://www.iis.fraunhofer.de/de/ff/zfp.html)
-[Experimental Physics V of the University of Würzburg](https://www.physik.uni-wuerzburg.de/ep5/),
+`Fraunhofer EZRT<https://www.iis.fraunhofer.de/de/ff/zfp.html>`
+`Experimental Physics V of the University of Würzburg<https://www.physik.uni-wuerzburg.de/ep5/>`,
 and
-[Thünen Institute of Wood Research](https://www.thuenen.de/de/fachinstitute/holzforschung).
+`Thünen Institute of Wood Research<https://www.thuenen.de/de/fachinstitute/holzforschung>`.
 
 
 .. toctree::
