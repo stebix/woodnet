@@ -29,6 +29,7 @@ dependencies:
   - pillow
   - pytest
   - ruamel.yaml
+  - frozendict
   - pip>=20
   - pip:
       - sphinx-argparse-cli

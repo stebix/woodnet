@@ -26,3 +26,4 @@ dependencies:
   - pillow
   - pytest
   - ruamel.yaml
+  - frozendict
