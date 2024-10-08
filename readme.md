@@ -11,7 +11,7 @@ Welcome to the `woodnet` repository. This code infrastructure arose as part of t
 advanced computed tomography imaging for wood scientific applications.
 The package is aimed at providing a data processing and deep learning infrastructure for imaging data in the context of wood scientific and wood anatomical classification.
 The imaging modality is thereby not baked in!
-In our founding project, we used it for 3D (volumetric), 2.5D (orthogonal channel-wise concatenated) and 2D (planar) imaging data stemming from advanced, sub-$\mathrm{\mu}$ computed tomography data.
+In our founding project, we used it for 3D (volumetric), 2.5D (orthogonal channel-wise concatenated) and 2D (planar) imaging data stemming from advanced, sub-μm computed tomography data.
 The pipeline can be used directly for photographic (e.g. planar RGB), microscopic cross-sectional (e.g. 2.5D multi-channel) and magnetic resonance imaging data (e.g. 3D volumetric).
 
 Core features encompass facilities for data loading and transforming, data splitting for cross validation purposes, fitting deep learning models (logging, checkpointing, metrics visualization with `tensorboard`) and thorough evaluation of these models with input data transformations.
