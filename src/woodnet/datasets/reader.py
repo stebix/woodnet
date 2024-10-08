@@ -25,7 +25,7 @@ def read_fingerprint_from_zarr(path: PathLike) -> dict:
     """
     Read the fingerprint from a zarr file.
 
-    Parameters:
+    Parameters
     ----------
 
     path : Path to the zarr file.
