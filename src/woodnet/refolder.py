@@ -21,7 +21,7 @@ def create_parser() -> argparse.ArgumentParser:
                         help='Flag to skip validation via the pydantic model.')
 
     parser.add_argument('--force-write', '-f', action='store_true',
-                        help='Flag to overwrite any preeixting file at the target location.')
+                        help='Flag to overwrite any preexisting file at the target location.')
     return parser
 
 

@@ -231,7 +231,7 @@ class GaussianBlur:
         kernel = self._kernel.to(device=x.device, dtype=x.dtype)
         
         if x.ndim == 3:
-            # perform 3D convolution as series of 1D convoltuions -> separability theorem
+            # perform 3D convolution as series of 1D convolutions -> separability theorem
             for _ in range(3):
                 x = convolve(x, kernel, padding=self._ksize//2)
         else:

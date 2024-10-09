@@ -17,7 +17,7 @@ Here is a list of the available action verbs:
 
 For the core of the verbs, i.e. ``train``, ``batchtrain`` and ``predict``, simply a configuration file is required.
 The configuration file can be indicated via a path-like string following the verb.
-For exmaple, to train a model with a configuration file located at ``/path/to/config.yaml``, the following command can be used:
+For example, to train a model with a configuration file located at ``/path/to/config.yaml``, the following command can be used:
 
 .. code-block:: bash
 
