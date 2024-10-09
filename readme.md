@@ -134,7 +134,8 @@ tensorboard --logdir=.
 
 Accessing the provided URL or [`http://localhost:6006/`](http://localhost:6006/)
 opens the live dashboard.
-![Image from PyTorch Docs](https://pytorch.org/tutorials/_images/tensorboard_scalars.png)
+<img src="https://pytorch.org/tutorials/_images/tensorboard_scalars.png" width=50% height=50%>
+*Image from PyTorch Docs*
 
 ## Run Evaluation Experiment
 
