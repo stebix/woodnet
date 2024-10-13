@@ -5,7 +5,11 @@ import pytest
 
 from woodnet.configtools import load_yaml
 
-from woodnet.datasets.setup import DataConfiguration, group_instances_by_class, load_data_configuration
+from woodnet.datasets.setup import (DataConfiguration,
+                                    group_instances_by_class,
+                                    load_data_configuration,
+                                    retrieve_data_configuration_path,
+                                    load_env_file)
 
 FPATH = Path('/home/jannik/code/woodnet/tests/_dataconf.yaml')
 
@@ -18,6 +22,12 @@ def test_load_data_configuration() -> None:
     dataconf = load_data_configuration(FPATH)
     rich.print(dataconf)
 
+
+def test_load_env_file():
+    # TODO: dependent on local filesystem
+    env_file = Path('/home/jannik/code/woodnet/.env')
+    env = load_env_file(env_file)
+    rich.print(env)
 
 
 def test_correct_grouping(dataconf_raw):
@@ -32,3 +42,15 @@ def test_correct_grouping(dataconf_raw):
 
     assert set(result['pinus']) == expected_pinus_set
     assert set(result['acer']) == expected_acer_set
+
+
+def test_retrieve_data_configuration_path():
+    print(retrieve_data_configuration_path())
+
+
+def test_retrieve_data_configuration_from_environment(monkeypatch):
+    expected_dataconf_path = Path('/very/unusual/path/to/dataconf.yaml')
+    monkeypatch.setenv('DATA_CONFIGURATION_PATH', str(expected_dataconf_path))
+    result = retrieve_data_configuration_path()
+
+    assert result == expected_dataconf_path
