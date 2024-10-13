@@ -6,6 +6,7 @@ Advanced plotting tooling for visualization of prepared results dataframes.
 import numpy as np
 from collections.abc import Sequence
 from pathlib import Path
+import warnings
 
 import pandas as pd
 import seaborn as sn
@@ -17,12 +18,15 @@ from matplotlib.axes import Axes
 
 
 def dual_performance_plot(df: pd.DataFrame, metric: str,
+                          axes: Sequence[Axes] | None = None,
                           noise_likes: Sequence[str] | None = None,
                           resol_likes: Sequence[str] | None = None,
                           metric_alias: str | None = None) -> tuple[Figure, Sequence[Axes]]:
     """
     Plot the accuracy as two-panel plot for a properly prepared dataframe.
     The dataframe should have a multi-index with stage-0 set for every transform.
+
+    A pair of axes can be supplied, otherwise figure and axes are created.
     """
     df = df.reset_index()
     df = df.loc[df.metric == metric]
@@ -34,8 +38,12 @@ def dual_performance_plot(df: pd.DataFrame, metric: str,
     subdf_noise = df.loc[df['transform'].isin(noise_transforms)] 
     subdf_resol = df.loc[df['transform'].isin(resolution_transforms)]
     
-    fig, axes = plt.subplots(ncols=2, sharey=True, figsize=(10, 3))
-    axes = axes.flat
+    if axes is None:
+        fig, axes = plt.subplots(ncols=2, sharey=True, figsize=(10, 3))
+        axes = axes.flat
+    else:
+        if not all(isinstance(ax, Axes) for ax in axes) and len(axes) != 2:
+            warnings.warn('axes argument should be a flat sequence of two axes')
     
     ax = axes[0]
     sn.lineplot(subdf_noise, x='stage', y='value', hue='transform', style='transform',
