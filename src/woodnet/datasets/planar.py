@@ -92,7 +92,7 @@ class EagerSliceDataset(torch.utils.data.Dataset):
     Useful for repeated prediction e.g. in the context of a 
     jupyter notebook environment.
     """
-    # TODO: Refactor constructor without expicit dependency on volume
+    # TODO: Refactor constructor without explicit dependency on volume
     def __init__(self,
                  phase: Literal['train', 'val'],
                  volume: np.ndarray,
@@ -186,7 +186,7 @@ class TiledEagerSliceDataset(torch.utils.data.Dataset):
     Useful for repeated prediction e.g. in the context of a 
     jupyter notebook environment.
     """
-    # TODO: Refactor constructor without expicit dependency on volume
+    # TODO: Refactor constructor without explicit dependency on volume
     def __init__(self,
                  phase: Literal['train', 'val'],
                  volume: np.ndarray,
@@ -384,5 +384,5 @@ class TiledEagerSliceDatasetBuilder:
         for child in cls.base_directory.iterdir():
             if child.match(f'*/{ID}*'):
                 return child
-        raise FileNotFoundError(f'could not retrieve datset with ID "{ID}" from '
+        raise FileNotFoundError(f'could not retrieve dataset with ID "{ID}" from '
                                 f'basedir "{cls.base_directory}"')

@@ -24,7 +24,6 @@ Core features encompass facilities for data loading and transforming, data split
 
 ## Getting Started
 
-
 ### Installation
 
 To install the project into your local machine, first pull the repository to a location you desire.
@@ -105,45 +104,77 @@ If we are more interested in using parts of the code as a library, then the docu
 
 ## Run Training Experiment
 
-The necessary prerequisites for smoothly running a training experiment is a valid data loading setup (the system must know here to find our training end evaluation data) and a training configuration file
-(the system must know the precise parameters for the manifold numbers of settings present fro a deep learning experiment).
+The necessary prerequisites for smoothly running a training experiment are a valid data loading setup (the system must know here to find our training end evaluation data) and a training configuration file
+(the system must know the precise parameters for the manifold numbers of settings present for a deep learning experiment).
 If we set up our training experiment configuration with all necessary [components](#components) at a location of our choice, we can run the task via the command line invocation
 
 ```bash
 net train /path/to/training-configuration.yaml
 ```
 
-Then the training starts and runs according to your settings. Keep the terminal open and check for progress reporting via progress bars. 
+Then the training starts and runs according to the configurations settings.
+We need to keep the terminal open and can check for progress reporting via progress bars.
 
+### Training Monitoring
+
+When the training tasks runs successfully, we can monitor the - possibly long running - training process live.
+For this, we can either read the emitted log records in the log file (with a tool like `lnav`) or use a visualization tool.
+The `woodnet` package uses [`tensorboard`](https://www.tensorflow.org/tensorboard) to monitor the training process.
+To use it, in a separate terminal that has the `woodanalysis` environment enabled, navigate to the defined experiment directory
+
+```bash
+cd /path/to/awesome/experiment-dir
+```
+
+from our training experiment configuration. Then we can start the tensorboard server with
+
+```bash
+tensorboard --logdir=.
+```
+
+Accessing the provided URL or [`http://localhost:6006/`](http://localhost:6006/)
+opens the live dashboard.
+<img src="https://pytorch.org/tutorials/_images/tensorboard_scalars.png" width=50% height=50%>
+*Image from PyTorch Docs*
 
 ## Run Evaluation Experiment
 
-To thoroughly evaluate an experiment with cross validation, we can use the CLI tooling again.
-Here, it is necessary the the experiment directory layout is canonical like so:
+To thoroughly evaluate an experiment with cross validation, we can use the CLI tooling again. The ``woodnet`` package facilitates automated evaluation (model loading & configuration fold-wise and checkpoint-wise) and evaluation with
+input data transformations. Results are stored on the file system and can be aggregated with further tools.
+Of course, it is necessary that we have completed $N >= 2$ successful training experiments with cross validation to evaluate them.
+The evaluation pipeline expects that the individual training experiments in the cross validation context are laid out in a canonical structure.
+The structure is illustrated below:
+
 ```
-experiment-basedir/
-├── fold-1/
-│ |-- logs/
-| |-- checkpoints/
-├── fold-2/
-│ |-- logs/
-| |-- checkpoints/
-├── fold-N/
-│ |-- logs/
-| |-- checkpoints/
-|--- inference/         # newly created for inference run
-│ |-- timestamp-1/
-| |-- timestamp-2/
+.
+└── cv-experiment-basedir/
+    ├── fold-1/
+    │   ├── logs/
+    │   └── checkpoints/
+    ├── fold-2/
+    │   ├── logs/
+    │   └── checkpoints/
+    ├── ...
+    ├── fold-N/
+    │   ├── checkpoints/
+    │   └── logs/
+    └── inference/                  # newly created on first evaluation task
+        └── timestamp-1/            # subsequent runs get unique timestamps
+            ├── evaluation.json
+            ├── timestamp.log
+            └── ...
 ```
-For such a training experiment result, we can run the full evaluation again via CLI via
+
+For such a training experiment layout, we can run the full evaluation again via CLI via
+
 ```bash
 net evaluate /path/to/experiment-basedir transform-template 
 ```
+
 The second argument is the template name (name for builtin, path for template file anywhere on the system) specifying the transformations to use for the robustness evaluation.
 Then the system will perform predictions and evaluate all models (could be many due to the sampling/saving of model states) of all folds (determined by our CV strategy) with all transformations (set in the transform template) applied to the input data and aggregate the results in an inference directory created on the level of the `fold-N` directories.
 For every evaluation run, a new subdirectory with the timestamp of the run is created.
-We can then process, analyse and visualize the aggregated performance metrics to gain insights over model performance and potential performance degradation for input data transformation.
-
+We can then process, analyze and visualize the aggregated performance metrics to gain insights over model performance and potential performance degradation for input data transformation.
 
 # Components
 
@@ -181,13 +212,30 @@ more information for every ID. This leads to the following layout:
 
 ```yaml
 instance_mapping :
+
   awesome-unicorn:
     location: '/my/fancy/location/awesome-unicorn.zarr'
     classname: hardwood
     group: pristine
+
+  scan-ef04:
+    location: '/my/fancy/location/scan-ef04.zarr'
+    classname: softwood
+    group: pristine
+
+  scan-c07f:
+    location: '/my/other/data/location/scan-c07f.zarr'
+    classname: hardwood
+    group: withered
+
+  jean-luc-picard:                                      # unique ID can be different from file name
+    location: '/another/datasource/scan-x07j.zarr'      # but similarity can be a good idea
+    classname: hardwood
+    group: withered
 ```
 
-In the above example, we specified the dataset instance with the unique ID `awesome-unicorn`.
+In the above example, we specified the first dataset instance with the unique ID `awesome-unicorn`.
+Of course, arbitrarily many datasets - each with unique ID - can be specified with the file.
 The fundamental data is expected to be at `'/my/fancy/location/awesome-unicorn.zarr'`.
 Note that any unique string ID can be chosen here, even much more mundane like e.g. `scan-1`
 for the first scan of a hypothetical series of scans.
@@ -220,7 +268,7 @@ This block sets the output directory for the training experiment and the trainin
 
 ```yaml
 experiment_directory: /path/to/awesome/experiment-dir
-device: cuda:1
+device: cuda:1                                            
 ```
 
 #### Training Directory
@@ -236,6 +284,21 @@ The permanent artifacts are:
 - Configuration file: the configuration file for the training experiment is backed up in this directory as well. This enables the analysis of the experiment later on (very handy!). This file is also located in the `logs` directory.
 
 - `tensorboard` log file: We use this library to visualize and analyze the training experiment on the fly. More on this later. This file is also located in the `logs` directory.
+
+This leads to the layout shown below. Note that the file names may differ (timestamps, etc.).
+
+```
+.
+└── experiment-dir/
+    ├── checkpoints/
+    │   ├── chkpt_$UUID.pth            # model checkpoint file
+    │   ├── ...
+    │   └── chkpt_$UUID-N.pth          # another model checkpoint file
+    └── logs/
+        ├── $timestamp.log             # log file for full training experiment
+        ├── backup_training_configuration.yaml
+        └── events.out.tfevents.$UUID  # tensorboard event file
+```
 
 The directory will be created if it is not present. Due to the uniqueness of all above artifacts to a single training experiments it is highly recommended to choose a new training directory for each individual training experiment.
 
@@ -333,6 +396,7 @@ trainer:
 
 For a validation run, the training is paused and predictions for all validation data instances will be performed. The result of this run (i.e. the validation metric score) is reported to the log file and sent to the tensorboard inspection tool.
 Also, the model weights are saved as a checkpoint if the score for a validation run is optimal or in the top-`k`-optimal range.
+This setting influences the number of checkpoint files we may encounter in our ``checkpoints`` directory (see this [section](#run-evaluation-experiment)) after the conclusion of the run.
 We can set the maximum number of iterations and epochs as an exit condition for conclusion of the training experiment. Note that the system exits the experiment run as soon as the first of both criterions is fulfilled.
 
 ### Loaders Block
@@ -382,26 +446,33 @@ For training data augmentation, we can also specify one or as many as desired tr
 train:
   # select the training data instances via the unique identifiers that were set in the
   # data configuration file
-  instances_ID: [awesome-unicorn, acer-sample-1, pinus-sample-3]
+  instances_ID: [awesome-unicorn, scan-ef04, scan-c07f]
 
   transform_configurations:
     - name: Normalize
       mean: 1
       std:  0.5
+
+    - name: GaussianNoise
+      mean: 0.0
+      std: 0.5
+      p_execution: 0.33
 ```
 
-for the transformations, we can again make use of the simple `keyword : value` syntax of YAML. Minimally, the name attribute of the transform is required to find the corresponding class in the code.
+For the transformations, we can again make use of the simple `keyword : value` syntax of YAML. Minimally, the name attribute of the transform is required to find the corresponding class in the code.
 We can use custom transformation classes that are implemented inside the namespace/module `woodnet.transformations.transforms`. If we want to randomize the choice of transformations we can employ the container classes located in `woodnet.transformations.container`.
 An additional set of diverse transformations is provided via the [MONAI](https://docs.monai.io/en/stable/transforms.html#vanilla-transforms) third party package. These transforms are also automatically recognized via the name attribute (must exactly match the class name).
 The configuration is again performed via keyword passthrough.
+Thus, the keyword argument dictionary `{'mean' : 1, 'std' : 0.5}` is passed tp the `Normalize`
+class initializer.
 
 #### Validation Loader Subblock
 
-The validation loader section is in principle very similar to the training loaders subblock. An exemplary instance is given below
+The validation loader section is in principle very similar to the training loaders subblock. An exemplary instance is given below. In practice, a more extensive/substantial validation set is of course advisable.
 
 ```yaml
 val:
-  instances_ID: [jean-luc-picard, acer-sample-2, pinus-sample-1701]
+  instances_ID: [jean-luc-picard]
 
   transform_configurations:
     - name: Normalize
@@ -424,7 +495,17 @@ This ensures that the model performance is assessed on a variety of data splits,
 > Thus, other (hyper-) parameters should be kept the same.  
 
 The `woodnet` machinery provides some convenience tools to quickly perform cross validation for our training experiments to mitigate tedious manual editing and potential errors.
-The training-validation split can be performed with on of two currently supported splitting techniques:
+First, it offers automated splitting machinery operating automatically utilizing the dataset instances we declared in the instance mapping.
+The ``refolder`` tool then allows the creation of new configuration files from templates
+with training and validation dataset instances set according to the split!
+This simplifies performing cross validation experiments, since we can start with a basal configuration file, produce `N` fold-wise configurations from it and run the experiments sequentially with the `batchtrain` command. For a detailed specification of both commands head over to the [CLI documentation](https://woodnet.readthedocs.io/en/latest/usage.html#net-cli).
+
+> [!TIP]
+> To produce a set of fold-wise CV configurations, make sure to change both the training-test splits
+> and the experiment directory in the configuration.
+> The experiment directory setup should be such that the canonical directory structure shown [here](#run-evaluation-experiment) is reproduced.
+
+The core training-validation split of the unique IDs can be performed with on of two currently supported splitting techniques:
 
 - Stratified `k`-fold cross-validation is a variation of `k`-fold cross-validation that ensures each fold preserves the proportion of classes in the original dataset. In standard `k`-fold, the data is randomly split into `k` subsets, or folds, which can result in an uneven distribution of class labels in each fold, particularly in imbalanced datasets. Stratified `k`-fold addresses this by ensuring that each fold has a representative balance of classes, similar to the overall dataset.
 
@@ -440,8 +521,32 @@ The first approach is to directly modify the two core model files, e.g. `woodnet
 The second option works by copying your implementation file into the `woodnet.models` submodule of the full package.
 In practice, we can just put our custom model implementation inside a separate Python module (i.e. a `.py` file).
 > [!IMPORTANT]
->  The file should use an appropriate name with the indication prefix `customcontrib_$DESIREDNAME.py`, where the prefix with the trailing underscore `customcontrib_` must be used exactly.
+> The file should use an appropriate name with the indication prefix `customcontrib_$DESIREDNAME.py`, where the prefix with the trailing underscore `customcontrib_` must be used exactly.
 Then, we can copy this module to the `woodnet.models` submodule and use the custom model via the YAML configuration file workflow.
+
+If we create a custom model `SuperModel` in the file `customcontrib_SuperModel.py` like so:
+
+```python
+import torch
+
+class SuperModel(torch.nn.Module):
+    # supermodel implementation here
+    pass
+```
+
+then the file should be placed like so in the cloned repository layout:
+
+```
+.
+└── woodnet/
+    └── src/
+        └── woodnet/
+            └── models/
+                ├── volumetric.py                    # example builtin model file
+                └── customcontrib_SuperModel.py      # user-supplied model module
+```
+
+Currently, this is somewhat brittle and inconvenient. We do plan to improve this.
 The custom model implementation modules are then collected via a filename matching scheme and are available for the name-based instantiation logic.
 Note that when we create models from the configuration, the first model class with a matching name is used. If we implement custom models with the same name as already implemented model, name shadowing
 may lead to errors. Thusly pick an unique model class name.
