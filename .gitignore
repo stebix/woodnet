@@ -9,6 +9,9 @@ benchresults/
 # VS code stuff
 .vscode/
 
+# environment specific files
+.env
+
 # documetation build
 **/_build/
 
