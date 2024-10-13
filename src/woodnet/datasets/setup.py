@@ -49,6 +49,7 @@ def retrieve_data_configuration_path() -> Path:
         env_file = load_env_file(tentative_env_file_path)
         dataconf_path_envfile = env_file.get('DATA_CONFIGURATION_PATH', None)        
     else:
+        dataconf_path_envfile = None
         logger.info(f'Env file not found at expected location: \'{tentative_env_file_path}\'')
 
     dataconf_path_environ = os.environ.get('DATA_CONFIGURATION_PATH', None)

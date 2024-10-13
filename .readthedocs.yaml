@@ -4,6 +4,10 @@ build:
   os: "ubuntu-22.04"
   tools:
     python: "mambaforge-latest"
+  
+  jobs:
+    pre_build:
+      - export DATA_CONFIGURATION_PATH="../../../examples/dataconf.yaml"
 
 conda:
   environment: docs/environment-cpu.yaml
