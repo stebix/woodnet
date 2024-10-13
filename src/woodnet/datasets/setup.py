@@ -53,18 +53,22 @@ def retrieve_data_configuration_path() -> Path:
 
     dataconf_path_environ = os.environ.get('DATA_CONFIGURATION_PATH', None)
 
-    if dataconf_path_envfile and dataconf_path_environ:
+    both = dataconf_path_envfile and dataconf_path_environ
+    by_envvar = dataconf_path_environ and dataconf_path_envfile is None
+    by_envfile = dataconf_path_environ is None and dataconf_path_envfile
+
+    if both:
         # we got both info, but environment variable has higher precedence
         logger.info(
             f'Retrieved data configuration paths from both environment variable '
             f'and .env file. Using environment variable path due to higher precedence'
         )
         dataconf_path = Path(dataconf_path_environ)
-    elif dataconf_path_environ and dataconf_path_envfile is None:
+    elif by_envvar:
         # we only have the environment variable
         logger.info('Retrieved data configuration path from environment variable.')
         dataconf_path = Path(dataconf_path_environ)
-    elif dataconf_path_environ is None and dataconf_path_envfile:
+    elif by_envfile:
         # we only have the .env file
         logger.info('Retrieved data configuration path from .env file.')
         dataconf_path = Path(dataconf_path_envfile)

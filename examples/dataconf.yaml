@@ -1,0 +1,28 @@
+class_to_label_mapping:
+  softwood : 0
+  hardwood : 1
+
+instance_mapping:
+
+  awesome-unicorn:
+    location: '/my/fancy/location/awesome-unicorn.zarr'
+    classname: hardwood
+    group: pristine
+
+  scan-ef04:
+    location: '/my/fancy/location/scan-ef04.zarr'
+    classname: softwood
+    group: pristine
+
+  scan-c07f:
+    location: '/my/other/data/location/scan-c07f.zarr'
+    classname: hardwood
+    group: withered
+
+  jean-luc-picard:                                      # unique ID can be different from file name
+    location: '/another/datasource/scan-x07j.zarr'      # but similarity can be a good idea
+    classname: hardwood
+    group: withered
+
+
+internal_path: 'group/dataset'
