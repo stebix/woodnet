@@ -50,6 +50,7 @@ dependencies = [
 net = "woodnet.net:main"
 refolder = "woodnet.refolder:main"
 benchmark = "woodnet.benchmark:main"
+datasetup = "woodnet.datasetup:main"
 
 [project.urls]
 Homepage = "https://github.com/stebix/wn-companiontools/"
