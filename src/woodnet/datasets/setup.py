@@ -13,11 +13,20 @@ from pydantic import BaseModel, field_validator, ValidationError
 from woodnet.custom.exceptions import ConfigurationError
 from woodnet.configtools import load_yaml
 
-
 PathLike = Path | str
+
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def environ_get_helper(name: str, default: str = 'False') -> bool:
+    value = os.environ.get(name, default)
+    logger.debug(f'retrieved {name} = {value} from environment')
+    return value.lower() == 'true'
+
+
+IGNORE_DATA_CONFIGURATION_ERROR = environ_get_helper('IGNORE_DATA_CONFIGURATION_ERROR', 'False')
 
 
 def load_env_file(filepath: Path) -> dict:
@@ -78,10 +87,8 @@ def retrieve_data_configuration_path() -> Path:
         raise ConfigurationError(
             'No data configuration path found. Please specify in .env file or as environment variable.'
         )
+    print(list(dataconf_path.resolve().iterdir()))
     return dataconf_path
-
-
-DATA_CONFIGURATION_PATH: PathLike = retrieve_data_configuration_path()
 
 
 class InstanceFingerprint(BaseModel):
@@ -102,6 +109,13 @@ class DataConfiguration(BaseModel):
     internal_path: str
     class_to_label_mapping: dict[str, int]
     instance_mapping: dict[str, InstanceFingerprint]
+
+    @classmethod
+    def make_mock(cls) -> 'DataConfiguration':
+        fp = InstanceFingerprint(location='mock', classname='mock', group='mock')
+        return cls(internal_path='mock',
+                   class_to_label_mapping={'mock': 0},
+                   instance_mapping={'mock': fp})
 
 
 def load_data_configuration(filepath: Path) -> DataConfiguration:
@@ -173,13 +187,6 @@ def group_instances_by_class(instance_mapping: dict[str, InstanceFingerprint],
         raise ValueError(f'Invalid format \'{format}\'. Use \'list\' or \'mapping\'.')
     
 
-DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
-#
-INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
-INTERNAL_PATH = DATA_CONFIGURATION.internal_path
-CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
-
-
 class InstanceMappingLists(NamedTuple):
     IDs: list[str]
     CLASSES: list[str]
@@ -204,3 +211,26 @@ def convert_to_lists(instance_mapping: dict[str, InstanceFingerprint]) -> dict[s
         GROUPS.append(fingerprint.group)
 
     return InstanceMappingLists(IDS, CLASSES, GROUPS)
+
+
+
+# TODO: hotfix to enable doc building - bad design, should be cleaned up
+try:
+    DATA_CONFIGURATION_PATH: PathLike = retrieve_data_configuration_path()
+    DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
+    INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
+    INTERNAL_PATH = DATA_CONFIGURATION.internal_path
+    CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
+
+except (ConfigurationError, AttributeError) as e:
+
+    import warnings
+    warnings.warn('Data configuration not loaded. Downstream data loading tasks may fail.'
+                  'Please check configuration file.')
+    
+    # ignore intended only for testing and doc building
+    DATA_CONFIGURATION = DataConfiguration.make_mock()
+    INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
+    INTERNAL_PATH = DATA_CONFIGURATION.internal_path
+    CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
+    
