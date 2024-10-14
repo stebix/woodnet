@@ -4,7 +4,7 @@ import tqdm.auto as tqdm
 
 from collections.abc import MutableMapping, Callable
 from copy import deepcopy
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias, Mapping
 from torch.utils.tensorboard import SummaryWriter
 
 from woodnet.checkpoint.registry import Registry
@@ -19,7 +19,7 @@ from woodnet.extent import compute_training_extent
 from woodnet.logtools.tensorboard import init_writer
 from woodnet.logtools.tensorboard.modelparameters.loggers import create_parameter_logger
 from woodnet.checkpoint.registry import create_score_registry
-
+from woodnet.gradtools.clipping import create_gradclip_func
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
@@ -66,6 +66,7 @@ class Trainer:
                  save_model_checkpoint_every_n: int,
                  writer: SummaryWriter,
                  parameter_logger: ParameterLogger | None,
+                 grad_clipping: Mapping | None = None,
                  leave_total_progress: bool | None = None,
                  name: str = 'notset'
                  ) -> None:
@@ -107,6 +108,8 @@ class Trainer:
         self.use_amp = use_amp
         self.use_inference_mode = use_inference_mode
         self.gradscaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+
+        self.grad_clipping_fn: Callable | None = self.create_gradclip_func(grad_clipping)
 
         self.logger = logging.getLogger('.'.join((LOGGER_NAME, __class__.__name__)))
         
@@ -208,6 +211,11 @@ class Trainer:
             prediction, loss = self.forward_pass(data, label, criterion)
 
             self.gradscaler.scale(loss).backward()
+
+            if self.grad_clipping_fn is not None:
+                self.gradscaler.unscale_(optimizer)
+                self.grad_clipping_fn(self.model.parameters())
+
             self.gradscaler.step(optimizer)
             self.gradscaler.update()
 
@@ -383,6 +391,17 @@ class Trainer:
             wasteitem.remove()
 
         return None
+    
+
+    @staticmethod
+    def create_gradclip_func(conf: Mapping | None) -> Callable:
+        """
+        Generate the gradient clipping function from ``torch.nn`` by partial
+        application of the kwargs.
+        """
+        if conf is None:
+            return None
+        return create_gradclip_func(conf)
     
 
     @classmethod
