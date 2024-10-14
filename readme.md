@@ -187,6 +187,18 @@ to [control training experiments](#training-run-configuration) and performing pr
 ## Data Loading
 
 The central place to inject data into the `woodnet` system is via the `dataconf.yaml` configuration file.
+
+You have two ways to insert the path to the datac onfiguration file. Variant A is by using the CLI application. Variant B is by modification or creation of the `.env` environment file in the repository root on your machine.
+
+We can point the `woodnet` pipeline by inserting the location (absolute path ideally)
+in a `.env` file located in the repository root.
+
+```bash
+woodnet-repository
+  - .env                # create this here or modify it
+  - ...
+```
+
 There you exhaustively specify all data instances as a mapping from an unique identification string
 (ID) to certain metadata.
 In the following, this metadata is called the dataset instance *fingerprint*.
@@ -254,6 +266,50 @@ We additionally got samples that were exposed to the elements and mark these wit
 `group: withered` attribute. We can use the `group` data instance attribute during the creation of the cross-validation splits of the specified instances into the training set and the validation set.
 In addition to the "default" variant of class-stratified `k`-fold cross-validation we may then
 employ group-wise `k`-fold cross-validation. Then we can evaluate whether the model is able/flexible/intelligent enough to generalize across groups.
+
+The last necessary building block for the data configuration file is the specification of
+an internal path. The internal path is the last bit of information of the route to
+the basic numerical array data. Both current natively supported array formats (`zarr` and `hdf5`) support internal paths, allowing the bundling of multiple array-wise dataset in a single object. Thus, we need to sepcify the internal path for our datasets like so:
+
+```yaml
+internal_path: 'group/dataset'
+```
+
+You can choose this as you like, but for the time being it should be global for the subset of arrays we are using in training and evaluation.
+A full exemplary template of the data configuation file is shown
+
+```yaml
+class_to_label_mapping:
+  softwood : 0
+  hardwood : 1
+
+instance_mapping:
+
+  awesome-unicorn:
+    location: '/my/fancy/location/awesome-unicorn.zarr'
+    classname: hardwood
+    group: pristine
+
+  scan-ef04:
+    location: '/my/fancy/location/scan-ef04.zarr'
+    classname: softwood
+    group: pristine
+
+  scan-c07f:
+    location: '/my/other/data/location/scan-c07f.zarr'
+    classname: hardwood
+    group: withered
+
+  jean-luc-picard:                                      # unique ID can be different from file name
+    location: '/another/datasource/scan-x07j.zarr'      # but similarity can be a good idea
+    classname: hardwood
+    group: withered
+
+
+internal_path: 'group/dataset'
+```
+
+For your own experiments, just introduce your datasets into the file and use the unique identifiers in the configuration file to start a training experiment.
 
 ## Training Run Configuration
 
