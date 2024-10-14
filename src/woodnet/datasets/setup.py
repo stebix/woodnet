@@ -5,6 +5,7 @@ Central location for entire data setup.
 """
 import os
 import logging
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal, NamedTuple
@@ -13,11 +14,22 @@ from pydantic import BaseModel, field_validator, ValidationError
 from woodnet.custom.exceptions import ConfigurationError
 from woodnet.configtools import load_yaml
 
-
 PathLike = Path | str
+
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
+
+
+def environ_get_helper(name: str, default: str = 'False') -> bool:
+    value = os.environ.get(name, default)
+    logger.debug(f'retrieved {name} = {value} from environment')
+    return value.lower() == 'true'
+
+# settings to determine if the data configuration file is missing, malformed or incomplete
+# no fail and no warn is possible, but only recommended for docs building at the moment
+WARN_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('WARN_ON_DATA_CONFIGURATION_FAILURE', 'True')
+RAISE_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('RAISE_ON_DATA_CONFIGURATION_FAILURE', 'True')
 
 
 def load_env_file(filepath: Path) -> dict:
@@ -81,9 +93,6 @@ def retrieve_data_configuration_path() -> Path:
     return dataconf_path
 
 
-DATA_CONFIGURATION_PATH: PathLike = retrieve_data_configuration_path()
-
-
 class InstanceFingerprint(BaseModel):
     location: str
     classname: str
@@ -102,6 +111,13 @@ class DataConfiguration(BaseModel):
     internal_path: str
     class_to_label_mapping: dict[str, int]
     instance_mapping: dict[str, InstanceFingerprint]
+
+    @classmethod
+    def make_mock(cls) -> 'DataConfiguration':
+        fp = InstanceFingerprint(location='mock', classname='mock', group='mock')
+        return cls(internal_path='mock',
+                   class_to_label_mapping={'mock': 0},
+                   instance_mapping={'mock': fp})
 
 
 def load_data_configuration(filepath: Path) -> DataConfiguration:
@@ -173,13 +189,6 @@ def group_instances_by_class(instance_mapping: dict[str, InstanceFingerprint],
         raise ValueError(f'Invalid format \'{format}\'. Use \'list\' or \'mapping\'.')
     
 
-DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
-#
-INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
-INTERNAL_PATH = DATA_CONFIGURATION.internal_path
-CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
-
-
 class InstanceMappingLists(NamedTuple):
     IDs: list[str]
     CLASSES: list[str]
@@ -204,3 +213,48 @@ def convert_to_lists(instance_mapping: dict[str, InstanceFingerprint]) -> dict[s
         GROUPS.append(fingerprint.group)
 
     return InstanceMappingLists(IDS, CLASSES, GROUPS)
+
+
+WARN_AND_RAISE = WARN_ON_DATA_CONFIGURATION_FAILURE and RAISE_ON_DATA_CONFIGURATION_FAILURE
+WARN = WARN_ON_DATA_CONFIGURATION_FAILURE and not RAISE_ON_DATA_CONFIGURATION_FAILURE
+RAISE = RAISE_ON_DATA_CONFIGURATION_FAILURE and not WARN_ON_DATA_CONFIGURATION_FAILURE
+IGNORE = not WARN_ON_DATA_CONFIGURATION_FAILURE and not RAISE_ON_DATA_CONFIGURATION_FAILURE
+
+# TODO: hotfix to enable doc building - unclean design, should be cleaned up
+try:
+    DATA_CONFIGURATION_PATH: PathLike = retrieve_data_configuration_path()
+except (ConfigurationError, ValueError) as e:
+    if WARN_AND_RAISE:
+        logger.warning(f'Failed to retrieve data configuration path: {e}')
+        warnings.warn(f'Failed to retrieve data configuration path: {e}')
+        raise e
+    elif WARN:
+        logger.warning(f'Failed to retrieve data configuration path: {e}')
+        warnings.warn(f'Failed to retrieve data configuration path: {e}')
+    elif IGNORE:
+        logger.info(f'Ignoring failure to retrieve data configuration path: {e}')
+    
+    DATA_CONFIGURATION = DataConfiguration.make_mock()
+    logger.info('Using mock data configuration stand-in')
+
+else:
+    try:
+        DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
+    except (ConfigurationError, FileNotFoundError) as e:
+        if WARN_AND_RAISE:
+            logger.warning(f'Failed to load data configuration: {e}')
+            warnings.warn(f'Failed to load data configuration: {e}')
+            raise e
+        elif WARN:
+            logger.warning(f'Failed to load data configuration: {e}')
+            warnings.warn(f'Failed to load data configuration: {e}')
+        elif IGNORE:
+            logger.info(f'Ignoring failure to load data configuration: {e}')
+        
+        DATA_CONFIGURATION = DataConfiguration.make_mock()
+        logger.info('Using mock data configuration stand-in')
+
+
+INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
+INTERNAL_PATH = DATA_CONFIGURATION.internal_path
+CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
