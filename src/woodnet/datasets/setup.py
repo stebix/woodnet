@@ -5,6 +5,7 @@ Central location for entire data setup.
 """
 import os
 import logging
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal, NamedTuple
@@ -25,8 +26,10 @@ def environ_get_helper(name: str, default: str = 'False') -> bool:
     logger.debug(f'retrieved {name} = {value} from environment')
     return value.lower() == 'true'
 
-
-IGNORE_DATA_CONFIGURATION_ERROR = environ_get_helper('IGNORE_DATA_CONFIGURATION_ERROR', 'False')
+# settings to determine if the data configuration file is missing, malformed or incomplete
+# no fail and no warn is possible, but only recommended for docs building at the moment
+WARN_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('WARN_ON_DATA_CONFIGURATION_FAILURE', 'True')
+RAISE_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('RAISE_ON_DATA_CONFIGURATION_FAILURE', 'True')
 
 
 def load_env_file(filepath: Path) -> dict:
@@ -87,7 +90,6 @@ def retrieve_data_configuration_path() -> Path:
         raise ConfigurationError(
             'No data configuration path found. Please specify in .env file or as environment variable.'
         )
-    print(list(dataconf_path.resolve().iterdir()))
     return dataconf_path
 
 
@@ -213,24 +215,46 @@ def convert_to_lists(instance_mapping: dict[str, InstanceFingerprint]) -> dict[s
     return InstanceMappingLists(IDS, CLASSES, GROUPS)
 
 
+WARN_AND_RAISE = WARN_ON_DATA_CONFIGURATION_FAILURE and RAISE_ON_DATA_CONFIGURATION_FAILURE
+WARN = WARN_ON_DATA_CONFIGURATION_FAILURE and not RAISE_ON_DATA_CONFIGURATION_FAILURE
+RAISE = RAISE_ON_DATA_CONFIGURATION_FAILURE and not WARN_ON_DATA_CONFIGURATION_FAILURE
+IGNORE = not WARN_ON_DATA_CONFIGURATION_FAILURE and not RAISE_ON_DATA_CONFIGURATION_FAILURE
 
-# TODO: hotfix to enable doc building - bad design, should be cleaned up
+# TODO: hotfix to enable doc building - unclean design, should be cleaned up
 try:
     DATA_CONFIGURATION_PATH: PathLike = retrieve_data_configuration_path()
-    DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
-    INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
-    INTERNAL_PATH = DATA_CONFIGURATION.internal_path
-    CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
-
-except (ConfigurationError, AttributeError) as e:
-
-    import warnings
-    warnings.warn('Data configuration not loaded. Downstream data loading tasks may fail.'
-                  'Please check configuration file.')
+except (ConfigurationError, ValueError) as e:
+    if WARN_AND_RAISE:
+        logger.warning(f'Failed to retrieve data configuration path: {e}')
+        warnings.warn(f'Failed to retrieve data configuration path: {e}')
+        raise e
+    elif WARN:
+        logger.warning(f'Failed to retrieve data configuration path: {e}')
+        warnings.warn(f'Failed to retrieve data configuration path: {e}')
+    elif IGNORE:
+        logger.info(f'Ignoring failure to retrieve data configuration path: {e}')
     
-    # ignore intended only for testing and doc building
     DATA_CONFIGURATION = DataConfiguration.make_mock()
-    INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
-    INTERNAL_PATH = DATA_CONFIGURATION.internal_path
-    CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
-    
+    logger.info('Using mock data configuration stand-in')
+
+else:
+    try:
+        DATA_CONFIGURATION = load_data_configuration(DATA_CONFIGURATION_PATH)
+    except (ConfigurationError, FileNotFoundError) as e:
+        if WARN_AND_RAISE:
+            logger.warning(f'Failed to load data configuration: {e}')
+            warnings.warn(f'Failed to load data configuration: {e}')
+            raise e
+        elif WARN:
+            logger.warning(f'Failed to load data configuration: {e}')
+            warnings.warn(f'Failed to load data configuration: {e}')
+        elif IGNORE:
+            logger.info(f'Ignoring failure to load data configuration: {e}')
+        
+        DATA_CONFIGURATION = DataConfiguration.make_mock()
+        logger.info('Using mock data configuration stand-in')
+
+
+INSTANCE_MAPPING = DATA_CONFIGURATION.instance_mapping
+INTERNAL_PATH = DATA_CONFIGURATION.internal_path
+CLASSLABEL_MAPPING = DATA_CONFIGURATION.class_to_label_mapping
