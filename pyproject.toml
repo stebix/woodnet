@@ -53,5 +53,5 @@ benchmark = "woodnet.benchmark:main"
 datasetup = "woodnet.datasetup:main"
 
 [project.urls]
-Homepage = "https://github.com/stebix/wn-companiontools/"
-Issues = "https://github.com/stebix/wn-companiontools/issues"
+Homepage = "https://github.com/stebix/woodnet"
+Issues = "https://github.com/stebix/woodnet/issues"
