@@ -630,4 +630,4 @@ Python, PyTorch, monai, pytest, sphinx, and many more!
 ## About
 
 Author Jannik Stebani. Released under the MIT license.
-Accompanying manuscript: TODO:INSERT by Jannik Stebani, Tim Lewandrowski, Kilian Dremel and Simon Zabler
+Accompanying manuscript: TODO:INSERT by Jannik Stebani, Tim Lewandrowski, Kilian Dremel, Simon Zabler and Volker Haag
