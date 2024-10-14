@@ -7,8 +7,8 @@ build:
   
   jobs:
     pre_build:
-      - export WARN_ON_DATA_CONFIGURATION_FAILURE="False"
-      - export RAISE_ON_DATA_CONFIGURATION_FAILURE="False"
+      - export WARN_ON_DATA_CONFIGURATION_FAILURE='False'
+      - export RAISE_ON_DATA_CONFIGURATION_FAILURE='False'
 
 conda:
   environment: docs/environment-cpu.yaml
