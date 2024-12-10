@@ -43,7 +43,6 @@ def remodel_transform_result(result: TransformResultMapping) -> tuple[dict, dict
     into a generic `stage-$N` ID string. Returns a copy.
     """
     # extract necessary information
-    metadata = result.get('metadata')
     parametrizations = result.get('results')
     # setup conversion and cleaning
     stage_mapping = construct_stage_mapping(result)
