@@ -29,7 +29,7 @@ def require_unique_and_existing(paths: Sequence[Path]) -> Path:
           raise FileNotFoundError(f'specified path \'{path}\' does not exist on the file system')  
         return path
     if len(paths) == 0:
-        raise FileNotFoundError(f'empty path specification')  
+        raise FileNotFoundError('empty path specification')  
     raise ValueError(f'received non-unique path specification: \'{paths}\'')
 
 
