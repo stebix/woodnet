@@ -5,9 +5,7 @@ import itertools
 from random import sample
 from collections.abc import Sequence
 
-from woodnet.inference.parametrized_transforms import (CongruentTransformList,
-                                                       generate_parametrized_transforms,
-                                                       ParametrizedTransform)
+from woodnet.inference.parametrized_transforms import ParametrizedTransform
 from woodnet.datasets.volumetric_inference import (TransformedTileDataset,
                                                    TransformedTileDatasetBuilder,
                                                    set_parametrized_transform)
