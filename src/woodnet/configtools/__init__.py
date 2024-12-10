@@ -3,7 +3,6 @@ General configuration handling tooling.
 
 @jsteb 2023
 """
-import shutil
 import warnings
 import pathlib
 from collections.abc import Mapping
