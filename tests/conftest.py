@@ -7,11 +7,21 @@ import numpy as np
 import PIL
 import pytest
 import zarr
+import logging
 
 from pathlib import Path
 
 from woodnet.datasets.setup import InstanceFingerprint
 
+
+@pytest.fixture
+def TEST_ROOT_LOGGER_NAME() -> str:
+    """
+    Create test-wise globally available root logger
+    name for the unit and integration test context.\
+    """
+    TEST_ROOT_LOGGER_NAME: str = 'test'
+    return TEST_ROOT_LOGGER_NAME
 
 class TiffGenerator:
     """Produce physical TIFFs for testing purposes."""
