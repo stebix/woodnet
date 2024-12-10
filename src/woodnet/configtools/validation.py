@@ -11,8 +11,6 @@ from typing import Union, Literal
 from typing_extensions import Annotated
 from annotated_types import Gt
 
-from woodnet.custom.types import PathLike
-
 
 class Config(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True, extra='allow')
