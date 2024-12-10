@@ -35,6 +35,7 @@ import torch.utils
 import tqdm.auto as tqdm
 from frozendict import frozendict
 
+from woodnet.datasets import get_builder_class
 from woodnet.datasets.volumetric_inference import set_parametrized_transform
 from woodnet.evaluation.metrics import compute_cardinalities
 from woodnet.inference.parametrized_transforms import CongruentParametrizations, ParametrizedTransform
@@ -569,9 +570,6 @@ def deduce_dataset_recipe(configuration: Mapping) -> DatasetRecipe:
     return DatasetRecipe(IDs=instances_ID, class_name=class_name,
                          transform_confs=transform_configurations,
                          kwargs=kwargs)
-
-
-from woodnet.datasets import get_builder_class
 
 
 def create_loader_from(recipe: DatasetRecipe,
