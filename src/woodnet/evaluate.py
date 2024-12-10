@@ -253,9 +253,9 @@ def run_evaluation_experiment(basedir: str | Path,
     logger.info(f'Using batch size b = {batch_size}')
     logger.info(f'Using automatic mixed precision setting use_amp = {use_amp}')
     if use_inference_mode:
-        logger.info(f'Using optimized inference mode')
+        logger.info('Using optimized inference mode')
     else:
-        logger.info(f'Using standard no_grad mode')
+        logger.info('Using standard no_grad mode')
     logger.info(f'Using N = {num_workers} data loader worker processes')
     logger.info(f'Using setting \'{non_blocking_transfer=}\'')
     logger.info(f'Using setting \'{shuffle=}\'')
@@ -283,5 +283,5 @@ def run_evaluation_experiment(basedir: str | Path,
                   protocols=store_protocols,
                   directory=inference_directory,
                   logger=logger, preset_name=transforms_preset)
-    logger.info(f'Successful finalized evaluation experiment')
+    logger.info('Successful finalized evaluation experiment')
 
