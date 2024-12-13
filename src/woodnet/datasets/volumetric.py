@@ -23,7 +23,7 @@ from woodnet.transformations import from_configurations
 from woodnet.transformations.transformer import Transformer
 from woodnet.datasets.reader import Reader, deduce_reader_class
 from woodnet.datasets.setup import (InstanceFingerprint,
-                                    DATA_CONFIGURATION, INSTANCE_MAPPING,
+                                    INSTANCE_MAPPING,
                                     INTERNAL_PATH, CLASSLABEL_MAPPING)
 
 
