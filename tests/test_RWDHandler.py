@@ -5,12 +5,12 @@ import json
 from functools import partial
 from pathlib import Path
 
-from woodnet.checkpoint.handlers import RWDHandler, generate_filename
+from woodnet.checkpoint.handlers import RWDHandler, generate_filename, SEP
 
 MAGIC_WEIGHT_VALUE: float = 1701.0
 
 def init(module, value):
-    if type(module) == torch.nn.Linear:
+    if type(module) is torch.nn.Linear:
         module.weight.fill_(value)
 
 def check_magic_value(module):
@@ -36,17 +36,19 @@ def model():
 
 
 def test_generate_filename_prefix_no_qualifier():
-    expected_prefix = 'romulan_star_empire'
+    expected_prefix = 'romulan-star-empire'
+    assert SEP not in expected_prefix, f'test setup failure: separator \'{SEP}\' should not be in prefix'
     fname = generate_filename(prefix=expected_prefix)
-    prefix, *rest = fname.split('-')
+    prefix, *rest = fname.split(SEP)
     assert prefix == expected_prefix
 
 
 def test_generate_filename_prefix_with_qualifier():
-    expected_prefix = 'romulan_star_empire'
+    expected_prefix = 'romulan-star-empire'
+    assert SEP not in expected_prefix, f'test setup failure: separator \'{SEP}\' should not be in prefix'
     qualifier = 'superoptimal'
     fname = generate_filename(prefix=expected_prefix, qualifier=qualifier)
-    prefix, *rest = fname.split('-')
+    prefix, *rest = fname.split(SEP)
     assert prefix == expected_prefix
 
 
@@ -66,8 +68,29 @@ def test_check_working_directory_raises_exception():
         handler.check_working_directory(path=filepath)
 
 
-def test_write_and_read(model, tmp_path):
+def test_write_and_read_with_state_dict_serialization_target(model, tmp_path):
     handler = RWDHandler(directory=tmp_path, prefix='test-chkpt')
+    handler.serialization_target = 'state_dict'
+
+    savepath = handler.write(model, qualifier='test-optimal')
+
+    path_loaded_model = handler.read(path=savepath)
+    name_loaded_model = handler.read(name=savepath.name)
+
+    model.apply(check_magic_value)
+    # check that when we load the state dicts into the module container, then
+    # the different tensors/layers should all contain the magic value
+    model.load_state_dict(path_loaded_model)
+    model.apply(check_magic_value)
+
+    model.load_state_dict(name_loaded_model)
+    model.apply(check_magic_value)
+
+
+
+def test_write_and_read_with_module_serialization_target(model, tmp_path):
+    handler = RWDHandler(directory=tmp_path, prefix='test-chkpt')
+    handler.serialization_target = 'module'
     
     savepath = handler.write(model, qualifier='test-optimal')
 
