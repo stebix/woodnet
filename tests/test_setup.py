@@ -11,7 +11,7 @@ from woodnet.datasets.setup import (DataConfiguration,
                                     retrieve_data_configuration_path,
                                     load_env_file)
 
-FPATH = Path('/home/jannik/code/woodnet/tests/_dataconf.yaml')
+FPATH = Path('/home/jannik/code/woodnet/tests/assets/dataconf.yaml')
 
 @pytest.fixture
 def dataconf_raw():
