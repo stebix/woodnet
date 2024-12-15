@@ -19,7 +19,7 @@ def test_initial(strategy):
 @pytest.mark.skip
 def test_refold():
     thisfile = Path(__file__)
-    confpath = thisfile.parents[1] / 'woodnet/trainconf.yaml'
+    confpath = thisfile.parent / 'assets/trainconf.yaml'
     conf = load_yaml(confpath)
 
     result = refold_configuration(conf, strategy='stratified_group_kfold', foldnum=3)
