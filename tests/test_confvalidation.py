@@ -17,10 +17,10 @@ def test_trainer_model():
 
 
 def test_fully_validated_test_configuration():
-    fpath = Path(__file__).parents[1] / 'woodnet/trainconf.yaml'
+    fpath = Path(__file__).parents[0] / 'assets/trainconf.yaml'
     data = load_yaml(fpath)
     
     conf = TrainingConfiguration(**data)
 
-    print('isdir :: ', conf.experiment_directory.is_dir())
+    assert isinstance(conf, TrainingConfiguration)
 
