@@ -94,12 +94,12 @@ def retrieve_data_configuration_path() -> Path:
 
 
 class InstanceFingerprint(BaseModel):
-    location: str
+    location: str | Path
     classname: str
     group: str | None
 
     @field_validator('location')
-    def location(cls, value: str) -> Path:
+    def location(cls, value: str | Path) -> Path:
         return Path(value)
 
 
