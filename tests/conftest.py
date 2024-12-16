@@ -157,3 +157,7 @@ def mock_instance_mapping(tempdir, base_data_shape, internal_path):
     }
     instance_mapping = {k : InstanceFingerprint(**v) for k, v in instance_mapping_raw.items()}
     return instance_mapping
+
+
+
+from tests.scaffolding.syntheticdata import synthetic_dataset
