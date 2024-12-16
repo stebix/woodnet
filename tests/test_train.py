@@ -29,8 +29,9 @@ def test_retrieve_logged(caplog):
 
 
 # TODO: reliant on local filesystem
+@pytest.mark.skip
 def test_run_training_experiment_smoke():
-    p = '/home/jannik/code/woodnet/woodnet/trainconf.yaml'
+    p = '/home/jannik/code/woodnet/tests/assets/trainconf.yaml'
     run_training_experiment(p)
 
 
@@ -74,7 +75,7 @@ def test_create_loss():
 # TODO: reliant on local filesystem
 def test_create_loaders():
     yaml = YAML(typ='safe')
-    with open('/home/jannik/code/woodnet/woodnet/trainconf.yaml') as handle:
+    with open('/home/jannik/code/woodnet/tests/assets/trainconf.yaml') as handle:
         conf = yaml.load(handle)
 
     loaders = create_loaders(conf)
