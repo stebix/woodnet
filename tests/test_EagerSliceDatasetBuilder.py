@@ -21,4 +21,3 @@ def test_smoke_instantiation():
     data, label = element
     assert data.ndim == 3, f'expecting 3D (C x H x W) data, but got ndim = {data.ndim}'
     assert label.ndim == 1, f'expecting 1D classification label, but got ndim = {label.ndim}'
-
