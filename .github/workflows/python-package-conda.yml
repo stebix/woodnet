@@ -30,6 +30,7 @@ jobs:
       - name: Test
         shell: bash -el {0}
         run: |
+          pip install --editable . --no-deps
           pytest -m 'not usesgpu'
 
 
