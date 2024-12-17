@@ -618,6 +618,16 @@ Firstly, the implementation could be adopted as a purpose-built template to inje
 Furthermore, adoption to **light microscopic** datasets is easily conceivable since a fully planar 2D formulation is included in the package.
 Also, usage with **multiplanar microscopic** images is possible. For this, the triaxial formulation with a preset ordering for the typical wood anatomic cross sections may be appropriate.
 
+### Planned Features and Todos
+
+As expected with almost any software project, there are still parts under construction and there is always potential to
+improve. The following open points will be addressed in the near future:
+
+- [ ] Add separation between core usage and development dependencies
+- [ ] Build as PyPI package to facilitate easier deployment for users
+- [ ] Improve and expand testing and testing coverage
+- [ ] Expand documentation on readthedocs
+
 ### Bugs, Questions, Requests and Contributions
 
 If you find bugs or have general questions please do not hesitate to open an issue. We will gladly try to answer and improve the pipeline.
