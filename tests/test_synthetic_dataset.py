@@ -3,25 +3,38 @@ Meta-test for synthetic dataset scaffolding.
 """
 import random
 
-from typing import Any
-
 import torch
 
+import pytest
+
 from woodnet.datasets.volumetric import TileDatasetBuilder, TileDataset
-from woodnet.datasets.setup import InstanceFingerprint
+
+from tests.scaffolding.syntheticdata import extract_classlabel_mapping, ClassSpecification
+
+
+def test_extract_classlabel_mapping_with_inconsistent_specs():
+    specs = [
+        ClassSpecification(name='acer', label=0, groups={'red', 'green'}, instances_per_group=1),
+        ClassSpecification(name='pinus', label=1, groups={'blue', 'green'}, instances_per_group=1),
+        ClassSpecification(name='pinus', label=2, groups={'blue', 'green'}, instances_per_group=1),
+    ]
+    with pytest.raises(ValueError):
+        extract_classlabel_mapping(specs)
+
 
 
 def test_build_tile_dataset_from_synthetic_source(synthetic_dataset):
-    data_configuration = synthetic_dataset.data_configuration
-    instance_mapping = data_configuration.instance_mapping
-
+    instance_mapping = synthetic_dataset.instance_mapping
     N_dataset = 4
-
     instances_ID = random.choices(
         list(instance_mapping.keys()), k=N_dataset
     )
-    instance_mapping = {k : InstanceFingerprint(**v) for k, v in instance_mapping.items()}
+    # Appropriately prepare the builder class. It was initialized with uninformative
+    # mock data, so we need to replace the instance mapping with the one from the
+    # synthetic dataset. Also, the internal path is relevant.
     TileDatasetBuilder.instance_mapping = instance_mapping
+    TileDatasetBuilder.internal_path = synthetic_dataset.internal_path
+    TileDatasetBuilder.classlabel_mapping = synthetic_dataset.classlabel_mapping
     builder = TileDatasetBuilder()
 
     tileshape = (64, 64, 64)
