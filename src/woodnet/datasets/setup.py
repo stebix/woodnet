@@ -32,12 +32,31 @@ WARN_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('WARN_ON_DATA_CONFIGURAT
 RAISE_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('RAISE_ON_DATA_CONFIGURATION_FAILURE', 'False')
 
 
-def load_env_file(filepath: Path) -> dict:
-    """Load the content of a simple key-value .env file."""
+def load_env_file(filepath: Path, stripchars: str = ' \t\n') -> dict:
+    """
+    Load the content of a simple key-value .env file as a dictionary.
+    Leading or trailing characters can be stripped from the keys and values.
+
+    Parameters
+    ----------
+
+    filepath : Path
+        Path to the .env file.
+
+    stripchars : str, optional
+        Characters to strip from the keys and values.
+        Default is ' \t\n', i.e. whitespace characters, tab and newline.
+
+    Returns
+    -------
+
+    content : dict
+        Dictionary with the key-value pairs from the .env file.
+    """
     with open(filepath, 'r') as f:
         lines = f.readlines()
         content = {
-            k : v for k, v in map(lambda x: x.split('='), lines)
+            k : v for k, v in map(lambda x: x.strip(stripchars).split('='), lines)
         }
     return content
 
