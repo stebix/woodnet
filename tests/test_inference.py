@@ -1,6 +1,7 @@
 import torch
 import pytest
 import rich
+import random
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -182,10 +183,13 @@ def noise_transforms() -> list[ParametrizedTransform]:
     return parametrizations
 
 
-@pytest.fixture(scope='function')
-def datasets() -> list[TileDataset]:
-    N: int = 2
-    ID: list[str] = ['CT10', 'CT9'] 
+@pytest.fixture
+def datasets(synthetic_dataset) -> list[TileDataset]:
+    instance_mapping = synthetic_dataset.instance_mapping
+    TileDatasetBuilder.instance_mapping = instance_mapping
+    # desired number of datasets
+    N: int = 3
+    ID: list[str] = random.choices(list(instance_mapping.keys()), k=N)
     builder = TileDatasetBuilder()
     datasets = builder.build(instances_ID=ID, phase='val', tileshape=(64, 64, 64),
                              transform_configurations=[{'name' : 'Identity'}])
