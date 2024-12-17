@@ -29,7 +29,7 @@ def environ_get_helper(name: str, default: str = 'False') -> bool:
 # settings to determine if the data configuration file is missing, malformed or incomplete
 # no fail and no warn is possible, but only recommended for docs building at the moment
 WARN_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('WARN_ON_DATA_CONFIGURATION_FAILURE', 'True')
-RAISE_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('RAISE_ON_DATA_CONFIGURATION_FAILURE', 'True')
+RAISE_ON_DATA_CONFIGURATION_FAILURE = environ_get_helper('RAISE_ON_DATA_CONFIGURATION_FAILURE', 'False')
 
 
 def load_env_file(filepath: Path) -> dict:
