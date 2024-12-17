@@ -1,6 +1,5 @@
 import pathlib
 import pytest
-import logging
 
 from woodnet.checkpoint import ScoredCheckpoint, excise_optimal_qualifier
 from woodnet.checkpoint.scores import ScoreRank
@@ -58,7 +57,7 @@ def test_demote_checkpoint_with_nonoptimal_rank(testfilepath, caplog):
 
 
 def test_demote_checkpoint_with_nonexciseable_qualifier(tmp_path, caplog):
-    fpath = tmp_path / f'picard-is%top_captain.pth'
+    fpath = tmp_path / 'picard-is%top_captain.pth'
 
     with fpath.open(mode='w') as handle:
         handle.write('Hello World from Pytest!')

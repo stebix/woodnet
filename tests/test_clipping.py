@@ -1,4 +1,3 @@
-import torch
 import pytest
 
 from woodnet.gradtools.clipping import create_gradclip_func
