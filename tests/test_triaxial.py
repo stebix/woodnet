@@ -1,5 +1,8 @@
-from pathlib import Path
+"""
+Test triaxial dataset builder.
 
+@Author: Jannik Stebani 2024
+"""
 import pytest
 
 from woodnet.datasets.triaxial import TriaxialDatasetBuilder
