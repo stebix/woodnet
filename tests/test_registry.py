@@ -6,7 +6,7 @@ import math
 from functools import partial
 
 from woodnet.checkpoint.handlers import RWDHandler
-from woodnet.checkpoint.registry import *
+from woodnet.checkpoint.registry import ScorePreference, Registry, get_registry_class, create_score_registry
 
 
 def is_posinf(value):
@@ -17,7 +17,7 @@ def is_neginf(value):
 
 
 def init(module, value):
-    if type(module) == torch.nn.Linear:
+    if type(module) is torch.nn.Linear:
         module.weight.fill_(value)
     
 
