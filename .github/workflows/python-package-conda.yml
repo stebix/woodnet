@@ -12,15 +12,21 @@ jobs:
         os: ["ubuntu-latest"]
         python-version: ["3.11", "3.12"]
     steps:
+      - uses: actions/checkout@v4
+
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          activate-environment: woodanalysis
+          environment-file: environment-cpu.yaml
 
       - name: Conda info
         shell: bash -el {0}
-        run: conda info
+        run: |
+          conda info
+          conda list
 
-      - uses: actions/checkout@v4
+
 
 
