@@ -1,5 +1,8 @@
-import pytest
+"""
+Test validation of exemplary configuration files.
 
+@Author: Jannik Stebani 2024
+"""
 from pathlib import Path
 
 from woodnet.configtools import load_yaml
@@ -13,7 +16,7 @@ def test_trainer_model():
         'max_num_epochs' : 4,
         'max_num_iters' : 100
     }
-    t = Trainer(**data)
+    _ = Trainer(**data)
 
 
 def test_fully_validated_test_configuration():
