@@ -55,7 +55,7 @@ def Zarr_testdata(tmp_path) -> tuple[Path, np.ndarray, dict]:
     array = zarr.convenience.open(fpath, mode='w')
     groupname, datasetname = ZARR_INTERNAL_PATH.split('/')
     group = array.create_group(groupname)
-    dataset = group.create_dataset(datasetname, data=data)
+    group.create_dataset(datasetname, data=data)
     array.attrs.update(fingerprint)
     return (fpath, data, fingerprint)
 

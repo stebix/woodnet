@@ -5,7 +5,6 @@ the histogram parameter logging.
 @jsteb 2024
 """
 import torch
-import pytest
 
 from woodnet.models.volumetric import ResNet3D
 from woodnet.logtools.tensorboard.modelparameters.extraction import (extract_simple_resnet_parameters,
