@@ -21,6 +21,7 @@ from woodnet.inference.parametrized_transforms import (CongruentTransformList,
                                                        )
 
 
+@pytest.mark.usescuda
 @pytest.fixture
 def configuration() -> dict:
     """Provides an authentic training configuration."""
@@ -210,6 +211,8 @@ def test_loader(datasets):
 
 
 class Test_evaluate:
+
+    @pytest.mark.usescuda
     @pytest.mark.slow
     def test_smoke_basic(self, datasets, smooth_transforms):
         import rich
@@ -237,6 +240,8 @@ class Test_evaluate:
         
 
 class Test_Predictor:
+
+    @pytest.mark.usescuda
     @pytest.mark.slow
     def test_smoke_predict_method(self, test_loader, smooth_transforms, noise_transforms):
         """Basic smoke test: method should run through and provide a results dictionary."""
@@ -271,6 +276,7 @@ class Test_Predictor:
 
 class Test_evaluate_multiple:
 
+    @pytest.mark.usescuda
     @pytest.mark.slow
     def test_smoke(self, smooth_transforms, noise_transforms, test_loader):
         """Basal test that the function runs for a correct setup."""
@@ -297,6 +303,7 @@ class Test_evaluate_multiple:
         rich.print(results)
 
 
+    @pytest.mark.usescuda
     @pytest.mark.slow
     def test_smoke_compiled_model(self, smooth_transforms, noise_transforms, test_loader):
         """Basal test that the function runs for a correct setup where the model is compiled."""
