@@ -12,8 +12,8 @@ from woodnet.datasets.setup import InstanceFingerprint
 
 
 def test_build_tile_dataset_from_synthetic_source(synthetic_dataset):
-    data_configuration = synthetic_dataset['data_configuration']
-    instance_mapping: dict[str, Any] = data_configuration['instance_mapping']
+    data_configuration = synthetic_dataset.data_configuration
+    instance_mapping = data_configuration.instance_mapping
 
     N_dataset = 4
 
