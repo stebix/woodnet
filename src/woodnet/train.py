@@ -351,7 +351,7 @@ def run_training_experiment(configuration: dict | Path | str,
         validation_criterion=None,
         leave_total_progress=True
     )
-    logger.info(f'Successfully created trainer object. initializing core training loop')
+    logger.info('Successfully created trainer object. initializing core training loop')
     trainer.train()
 
     logger.info('Successfully concluded train method.')
