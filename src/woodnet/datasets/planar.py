@@ -17,9 +17,8 @@ import tqdm.auto as tqdm
 import zarr
 
 from woodnet.datasets.utils import add_channel_dim
-from woodnet.dataobjects import AbstractSlice, Volume
+from woodnet.dataobjects import AbstractSlice
 from woodnet.datasets.constants import DEFAULT_CLASSLABEL_MAPPING, CLASSNAME_REMAP
-from woodnet.inference.parametrized_transforms import ParametrizedTransform
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations 
 from woodnet.datasets.tiling import PlanarTileBuilder

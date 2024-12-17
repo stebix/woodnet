@@ -22,6 +22,7 @@ from woodnet.hooks import install_loginterceptor_excepthook
 from woodnet.logtools.infrastructure import (create_logging_infrastructure,
                                              finalize_logging_infrastructure,
                                              create_logfile_name)
+from woodnet.logtools.tensorboard import init_writer
 from woodnet.extent import compute_training_extent
 from woodnet.globconf import (configure_torch_cpu_threading,
                               TORCH_NUM_THREADS, TORCH_NUM_INTEROP_THREADS)
@@ -274,6 +275,7 @@ def create_trainer(configuration: dict,
         device=device, max_num_epochs=extent.max_num_epochs, max_num_iters=extent.max_num_iters,
         log_after_iters=log_after_iters, validate_after_iters=validate_after_iters,
         use_amp=use_amp, use_inference_mode=use_inference_mode,
+        writer=writer,
         save_model_checkpoint_every_n=save_model_checkpoint_every_n,
         validation_metric=validation_metric,
         validation_metric_higher_is_better=validation_metric_higher_is_better,
@@ -475,7 +477,7 @@ def run_training_experiment_batch(configurations: Iterable[dict | Path | str],
             leave_total_progress=False
         )
 
-        logger.info(f'Successfully created trainer object. Initializing core training loop')
+        logger.info('Successfully created trainer object. Initializing core training loop')
         trainer.train()
         logger.info('Successfully concluded train method.')
 

@@ -30,8 +30,9 @@ def compute_training_extent(loader_length: int,
                             batchsize: int) -> TrainingExtent:
     
     if not any((max_num_epochs, max_num_iters, gradient_budget)): 
-        raise ValueError(f'training extent specification requires value for at least one variable of '
-                         f'max_num_epochs, max_num_iters or gradient_budget!')
+        raise ValueError('training extent specification requires value '
+                         'for at least one variable of max_num_epochs, '
+                         'max_num_iters or gradient_budget!')
     
     if gradient_budget:
         if max_num_epochs or max_num_iters:

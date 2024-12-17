@@ -8,8 +8,8 @@ from woodnet.datasets.volumetric import TileDatasetBuilder
 from woodnet.datasets.triaxial import TriaxialDatasetBuilder
 from woodnet.datasets.planar import (EagerSliceDatasetBuilder,
                                      TiledEagerSliceDatasetBuilder)
-from woodnet.datasets.utils import *
-from woodnet.datasets.constants import *
+from woodnet.datasets.utils import * # noqa: F403
+from woodnet.datasets.constants import * # noqa: F403
 
 def get_builder_class(dataset_name: str) -> type:
     """

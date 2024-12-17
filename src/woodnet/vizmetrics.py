@@ -1,6 +1,17 @@
+import torch
 import matplotlib.pyplot as plt
 
+from pathlib import Path
 from typing import Protocol
+
+
+from woodnet.models.planar import ResNet18
+
+from woodnet.datasets.planar import SliceDataset
+from woodnet.prediction import Predictor
+
+from woodnet.transformations.transformer import Transformer
+from woodnet.transformations import from_configurations
 
 
 class CardinalityLike(Protocol):
@@ -32,20 +43,6 @@ def plot_metrics(*metrics):
     plt.tight_layout()
 
 
-
-
-import torch
-from pathlib import Path
-
-from woodnet.models.planar import ResNet18
-from woodnet.loader import SliceLoader
-
-from woodnet.datasets.planar import SliceDataset
-from woodnet.prediction import Predictor
-
-from woodnet.transformations.transformer import Transformer
-from woodnet.transformations import from_configurations
-
 BASE_DIR = Path('/home/jannik/storage/trainruns-wood/')
 
 
@@ -72,7 +69,7 @@ def multievaluate(traindir_name: str,
 
     mapping = {'acer' : 0, 'pinus' : 1}
 
-    slices = list(loadhelpers.instances(IDs))
+    slices = list(loadhelpers.instances(IDs)) # noqa: F821
 
     print(f'Loaded N = {len(slices)} slices for inference')
 

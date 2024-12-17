@@ -2,7 +2,7 @@ import logging
 import torch
 import tqdm.auto as tqdm
 
-from typing import Literal, TypeAlias
+from typing import Literal
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -15,8 +15,8 @@ from woodnet.trainer.utils import TerminationReason, get_batchsize
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
-Tensor: TypeAlias = torch.Tensor
-DataLoader: TypeAlias = torch.utils.data.DataLoader
+Tensor = torch.Tensor
+DataLoader = torch.utils.data.DataLoader # noqa: F811
 
 class LegacyTrainer:
     """
@@ -30,7 +30,7 @@ class LegacyTrainer:
                  model: torch.nn.Module,
                  optimizer: torch.optim.Optimizer,
                  criterion: torch.nn.Module,
-                 loaders: dict[str, DataLoader],
+                 loaders: dict[str, DataLoader], # type: ignore
                  handler: ExperimentDirectoryHandler,
                  validation_criterion: torch.nn.Module,
                  validation_metric: str,
@@ -223,7 +223,7 @@ class LegacyTrainer:
         wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='validation', leave=False)
         running_validation_loss = TrackedScalar()
         running_validation_metrics = TrackedCardinalities()
-        self.logger.debug(f'Entering validation loop')
+        self.logger.debug('Entering validation loop')
 
         with self.disabled_gradient_context():
             for batch_idx, batch_data in enumerate(wrapped_loader):

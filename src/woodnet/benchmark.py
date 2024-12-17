@@ -1,5 +1,4 @@
 import argparse
-import rich
 
 from woodnet.benchmarking.bench_threads import run_benchmark
 

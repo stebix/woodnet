@@ -92,8 +92,8 @@ def retrieve_data_configuration_path() -> Path:
     if both:
         # we got both info, but environment variable has higher precedence
         logger.info(
-            f'Retrieved data configuration paths from both environment variable '
-            f'and .env file. Using environment variable path due to higher precedence'
+            'Retrieved data configuration paths from both environment variable '
+            'and .env file. Using environment variable path due to higher precedence'
         )
         dataconf_path = Path(dataconf_path_environ)
     elif by_envvar:

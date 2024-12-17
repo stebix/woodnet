@@ -1,4 +1,3 @@
-import numpy as np
 from numbers import Number
 
 from woodnet.evaluation.metrics import (compute_TPR, compute_TNR, compute_ACC,

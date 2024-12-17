@@ -7,11 +7,13 @@ import numpy as np
 import PIL
 import pytest
 import zarr
-import logging
 
 from pathlib import Path
 
 from woodnet.datasets.setup import InstanceFingerprint
+
+# Makes imported scaffolding and fixtures available to the test suite. 
+from tests.scaffolding.syntheticdata import synthetic_dataset # noqa: F401
 
 
 @pytest.fixture
@@ -159,5 +161,3 @@ def mock_instance_mapping(tempdir, base_data_shape, internal_path):
     return instance_mapping
 
 
-
-from tests.scaffolding.syntheticdata import synthetic_dataset

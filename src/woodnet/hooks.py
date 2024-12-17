@@ -1,5 +1,4 @@
 import sys
-import atexit
 import logging
 
 from collections.abc import Callable

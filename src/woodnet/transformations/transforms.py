@@ -29,7 +29,7 @@ class Identity:
         return x
     
     def __str__(self) -> str:
-        return f'Identity()'
+        return 'Identity()'
 
 
 class ToDevice:

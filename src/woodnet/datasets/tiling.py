@@ -6,7 +6,7 @@ Jannik Stebani 2023
 import numpy as np
 
 from collections.abc import Sequence
-from typing import Iterable, Optional, Literal
+from typing import Iterable, Optional
 from math import sqrt
 
 def mask_inside_circle(i, j, radius, shape):
@@ -75,7 +75,7 @@ def retrieve_pattern(a: int, radius: int, reltol: float = 0.01) -> str:
         Defaults to `0.01`.
     """
     ratio = radius / a
-    lower, upper = ratio * (1 - reltol), ratio * (1 + reltol)
+    lower, upper = ratio * (1 - reltol), ratio * (1 + reltol) # noqa: F841
     pattern_mapping = {
         sqrt(2) / 2 : '1',
         sqrt(5) / 2 : '2',

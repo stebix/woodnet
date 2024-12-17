@@ -1,5 +1,4 @@
 import json
-import datetime
 import torch
 
 from pathlib import Path
@@ -24,23 +23,24 @@ class IOHandler:
         pass
 
 
-
+# TODO: deprecated
 def build_dataset_2D(IDs: list[str],
                       transformer_config: list[dict]) -> SliceDataset:
     classlabel_mapping = {'acer' : 0, 'pinus' : 1}
     transformer = Transformer(*from_configurations(transformer_config))
-    slices = list(loadhelpers.instances(IDs))
+    slices = list(loadhelpers.instances(IDs)) # noqa: F821
     dataset = SliceDataset(phase='train', slices=slices,
                            classlabel_mapping=classlabel_mapping,
                            transformer=transformer)
     return dataset
 
 
+# TODO: deprecated
 def build_dataset_3D(IDs: list[str],
                       tileshape: tuple[int],
                       transformer_config: list[dict]) -> list[TileDataset]:
 
-    builder = loadhelpers.TileDatasetBuilder()
+    builder = loadhelpers.TileDatasetBuilder() # noqa: F821
     datasets = builder.build(*IDs, phase='train', tileshape=tileshape,
                              transform_configurations=transformer_config)
     dataset = torch.utils.data.ConcatDataset(datasets)
@@ -93,7 +93,7 @@ def evaluate(src_training_dir: PathLike,
     loss, cardinalities = predictor.run()
 
     results = {
-        'timestamp' : get_timestamp(),
+        'timestamp' : create_timestamp(),
         'modelpath' : str(model_path),
         'epoch' : epoch,
         'IDs' : IDs,
@@ -108,7 +108,7 @@ def evaluate(src_training_dir: PathLike,
             'ACC' : cardinalities.ACC
         }
     }
-    save_path = save_dir / f'evaluation-{get_timestamp()}.json'
+    save_path = save_dir / f'evaluation-{create_timestamp()}.json'
     with save_path.open(mode='w') as handle:
         json.dump(results, handle)
     return results

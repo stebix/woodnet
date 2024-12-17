@@ -338,7 +338,7 @@ class Trainer:
         wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='validation', leave=False)
         running_validation_loss = TrackedScalar()
         running_validation_metrics = TrackedCardinalities()
-        self.logger.debug(f'Entering validation loop')
+        self.logger.debug('Entering validation loop')
 
         with self.disabled_gradient_context():
             for batch_idx, batch_data in enumerate(wrapped_loader):
@@ -366,8 +366,13 @@ class Trainer:
                         f'FP = {cardinalities.FP} | FN = {cardinalities.FN} || '
                         f'error = \'{e}\''
                     )
-                    logger.error(f'traceback : \'{traceback.format_tb(e.__traceback__)}\'')
-                    logger.error(f'Runnning validation metrics state dict: \'{running_validation_metrics.state_dict()}\'')
+                    logger.error(
+                        f'traceback : \'{traceback.format_tb(e.__traceback__)}\''
+                    )
+                    logger.error(
+                        f'Runnning validation metrics state dict: '
+                        f'\'{running_validation_metrics.state_dict()}\''
+                    )
 
                 # TODO: REMOVE END #############################################
         

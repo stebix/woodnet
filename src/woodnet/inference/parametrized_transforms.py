@@ -130,7 +130,7 @@ class CongruentTransformList(UserList):
         
         if (item.name == self._name
                 and item.parameters.keys() == self._parameter_set
-                and type(item.transform) == self._transform_class
+                and type(item.transform) is self._transform_class
            ):
             return item
         else:

@@ -10,7 +10,7 @@ from collections.abc import Callable
 from functools import cached_property
 from torch import Tensor
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Iterable, Literal
 
 import torch.utils
 import torch.utils.data

@@ -6,7 +6,6 @@ Facilities to programmatically interact with training directories for inference 
 import logging
 import dataclasses
 
-from functools import cached_property
 from collections.abc import Sequence, Iterable, Mapping
 from pathlib import Path
 
@@ -14,6 +13,9 @@ from ruamel.yaml import YAML
 
 from woodnet.utils import create_timestamp
 from woodnet.directoryhandlers import mkdir_logged
+from woodnet.inference.utils import (RegisteredCheckpointFilepath,
+                                     EpochIntervalCheckpointFilepath,
+                                     parse_checkpoint)
 
 
 CHECKPOINT_DIR_NAME: str = 'checkpoints'
@@ -115,7 +117,6 @@ def get_fold_directories(basepath: Path, sort: bool = True) -> dict[int, Path]:
         directories = {k : directories[k] for k in sorted(directories.keys())}
     return directories
 
-from woodnet.inference.utils import RegisteredCheckpointFilepath, EpochIntervalCheckpointFilepath, parse_checkpoint
 
 @dataclasses.dataclass
 class TrainingResultBag:

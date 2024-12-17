@@ -222,7 +222,7 @@ def resurrect_models_from(pathmap: Mapping[str, Path],
         inject_state_dict(model, state_dict)
         model = configure_model(model, dtype=dtype, device=device, eval_mode=eval_mode,
                                 testing_flag=testing_flag)
-        logger.debug(f'Successfully re-created and configured model.')
+        logger.debug('Successfully re-created and configured model.')
         models[ID] = model
     return models
 

@@ -77,10 +77,12 @@ def create_loader(configuration: Mapping) -> torch.utils.data.DataLoader:
     tileshape: tuple[int, int, int] = loaders_config.pop('tileshape', default=(128, 128, 128))
 
     assert name == 'TransformedTileDataset'
+    builder_class = get_builder_class(name)
 
     phase = 'val'
     phase_config = deepcopy(loaders_config[phase])
     phase_config.update({'tileshape' : tileshape})
+    builder = builder_class()
     datasets = builder.build(**phase_config)
     dataset = torch.utils.data.ConcatDataset(datasets)
     shuffle = False

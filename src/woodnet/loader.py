@@ -2,7 +2,7 @@ import enum
 import warnings
 import numpy as np
 from pathlib import Path
-from typing import Optional, Iterable
+from typing import Iterable
 
 from woodnet.dataobjects import (SubvolumeFingerprint, Subvolume, AbstractSlice,
                                  CachingSlice, LazySlice, InstanceFingerprint, Volume)
@@ -55,7 +55,9 @@ def postprocess_index(index: str) -> int:
 
 
 def postprocess(attributes: dict) -> dict:
-    identity = lambda arg: arg
+
+    def identity(value): return value
+    
     func_mapping = {
         'ID' : postprocess_ID,
         'class_' : postprocess_class,

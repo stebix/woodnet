@@ -55,3 +55,8 @@ datasetup = "woodnet.datasetup:main"
 [project.urls]
 Homepage = "https://github.com/stebix/woodnet"
 Issues = "https://github.com/stebix/woodnet/issues"
+
+[tool.ruff]
+exclude = ["legacy"]
+line-length = 99
+indent-width = 4

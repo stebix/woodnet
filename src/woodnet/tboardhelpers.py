@@ -4,7 +4,6 @@ file after the conclusion of the training phase.
 
 Jannik Stebani 2023 
 """
-import numpy as np
 from pathlib import Path
 
 from tensorboard.backend.event_processing import event_accumulator
