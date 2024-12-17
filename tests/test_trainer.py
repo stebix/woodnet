@@ -1,7 +1,6 @@
 import os
 import logging
 
-from collections.abc import Mapping
 from pathlib import Path
 
 import torch
