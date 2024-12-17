@@ -13,7 +13,7 @@ subvolume_path = Path(
     '/home/jannik/storage/wood/chunked/CT10_Ahorn_40kV_200muA_5s_1mitt/subvol_0'
 )
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 def test_subvolume_loader():
     loader = SubvolumeLoader()
     sv = loader.from_top_directory(instance_path, index=0)
@@ -24,7 +24,7 @@ def test_subvolume_loader():
     print(sv.fingerprint)
 
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 def test_slice_loader():
     loader = SliceLoader()
     slices = loader.from_directory(subvolume_path)

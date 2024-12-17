@@ -33,7 +33,7 @@ def test_retrieve_logged(caplog):
 
 
 # TODO: reliant on local filesystem
-@pytest.mark.skip
+@pytest.mark.skip(reason='fsreliant')
 def test_run_training_experiment_smoke():
     p = '/home/jannik/code/woodnet/tests/assets/trainconf.yaml'
     run_training_experiment(p)
@@ -77,7 +77,7 @@ def test_create_loss():
 
 
 # flaky test debug laster
-@pytest.mark.skip
+@pytest.mark.skip(reason='flaky')
 def test_create_loaders(synthetic_dataset, monkeypatch):
     tileshape: tuple[int, int, int] = (128, 128, 128)
     batch_size: int = 2

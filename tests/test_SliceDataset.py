@@ -5,7 +5,7 @@ import pytest
 from woodnet.dataobjects import CachingSlice
 from woodnet.datasets.planar import SliceDataset
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 def test_basic_initialization_at_train_phase(tiff_generator, fingerprint):
     """
     Basic smoke test whether the dataset object works at all.

@@ -8,7 +8,7 @@ from woodnet.datasets.planar import EagerSliceDatasetBuilder
 
 # TODO: remove this obsolete test
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 @pytest.mark.slow
 def test_smoke_instantiation():
     builder = EagerSliceDatasetBuilder()

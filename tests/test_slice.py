@@ -6,7 +6,7 @@ import pytest
 from woodnet.dataobjects import CachingSlice
 
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 def test_correct_initialization_and_data_loading_from_disk(fingerprint, tiff_generator):
     tif_path = tiff_generator.make_one()
     slc = CachingSlice(filepath=tif_path, fingerprint=fingerprint, index=0)

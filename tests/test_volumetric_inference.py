@@ -23,7 +23,7 @@ def make_ranges(lengths: Sequence[int]) -> list[range]:
     return ranges
 
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 class Test_TransformedTileDatasetBuilder:
     @pytest.mark.slow
     def test_smoke_with_single_ID(self):
@@ -34,7 +34,7 @@ class Test_TransformedTileDatasetBuilder:
         assert isinstance(dataset, TransformedTileDataset)
 
 
-@pytest.mark.skip
+@pytest.mark.skip(reason='deprecated')
 class Test_set_parametrized_transform:
     """
     Stylistic questions about test function names:

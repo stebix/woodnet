@@ -115,12 +115,11 @@ class Test_excise_optimal_parameter:
             _ = excise_optimal_qualifier(testpath)
 
 
-@pytest.mark.skip
-def test_failure_on_missing_file():
+def test_exist_on_missing_file():
     nonexisting_filepath = pathlib.Path('./this-should-not-exist')
     assert not nonexisting_filepath.exists(), 'faulty test setup: nonexisting file path required'
     score = 0.9
     rank = ScoreRank.OPTIMAL
-    with pytest.raises(FileNotFoundError):
-        checkpoint = ScoredCheckpoint(score=score, filepath=nonexisting_filepath,
-                                      rank=rank)
+    checkpoint = ScoredCheckpoint(score=score, filepath=nonexisting_filepath,
+                                  rank=rank)
+    assert not checkpoint.exists(), 'should return False for nonexisting file path'
