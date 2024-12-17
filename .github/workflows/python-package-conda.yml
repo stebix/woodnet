@@ -31,7 +31,7 @@ jobs:
         shell: bash -el {0}
         run: |
           pip install --editable . --no-deps
-          pytest -m 'not usesgpu'
+          pytest -m 'not usescuda'
 
 
 
