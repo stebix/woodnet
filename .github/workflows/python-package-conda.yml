@@ -27,6 +27,11 @@ jobs:
           conda info
           conda list
 
+      - name: Test
+        shell: bash -el {0}
+        run: |
+          pytest -m 'not usesgpu'
+
 
 
 
