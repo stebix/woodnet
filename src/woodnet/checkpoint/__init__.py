@@ -64,3 +64,7 @@ class ScoredCheckpoint:
         self.filepath = demoted_filepath
         self.rank = ScoreRank.FEASIBLE
         return
+
+    def exists(self) -> bool:
+        """Check if the checkpoint file exists on the file system."""
+        return self.filepath.exists()
