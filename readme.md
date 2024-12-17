@@ -1,7 +1,7 @@
 # woodnet
 
 [![Documentation Status](https://readthedocs.org/projects/woodnet/badge/?version=latest)](https://woodnet.readthedocs.io/en/latest/?badge=latest)
-![CI Status](https://github.com/stebix/woodnet/actions/workflows/CI/badge.svg)
+![CI Status](https://github.com/stebix/woodnet/actions/workflows/CI.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
