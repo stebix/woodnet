@@ -58,8 +58,11 @@ def test_correct_grouping(dataconf_raw):
     assert set(result['acer']) == expected_acer_set
 
 
-def test_retrieve_data_configuration_path():
-    print(retrieve_data_configuration_path())
+def test_retrieve_data_configuration_path(monkeypatch):
+    expected_dataconf_path = Path('/path/to/dataconf.yaml')
+    monkeypatch.setenv('DATA_CONFIGURATION_PATH', str(expected_dataconf_path))
+    result = retrieve_data_configuration_path()
+    assert result == expected_dataconf_path
 
 
 def test_retrieve_data_configuration_from_environment(monkeypatch):
