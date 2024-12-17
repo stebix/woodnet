@@ -23,6 +23,7 @@ jobs:
         conda env create --file environment-cpu.yaml
     - name: Intialize conda at bash
       run: |
+        source /home/runner/.bashrc
         conda init
     - name: Test with pytest
       run: |
