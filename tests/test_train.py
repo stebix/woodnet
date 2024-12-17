@@ -1,5 +1,7 @@
 import logging
 import torch
+import string
+import numpy as np
 
 import pytest
 from ruamel.yaml import YAML
@@ -13,6 +15,8 @@ import woodnet.train as trainmodule
 from woodnet.train import (create_optimizer, create_loss, create_loaders,
                            run_training_experiment, get_ID_overlap, check_ID_overlap)
 
+import woodnet.datasets.setup as setup
+import woodnet.datasets.volumetric
 
 def test_retrieve_logged(caplog):
     caplog.set_level(logging.DEBUG)
@@ -72,15 +76,79 @@ def test_create_loss():
     assert isinstance(loss, torch.nn.BCEWithLogitsLoss)
 
 
-# TODO: reliant on local filesystem
-def test_create_loaders():
+def test_create_loaders(synthetic_dataset, monkeypatch):
+    tileshape: tuple[int, int, int] = (128, 128, 128)
+    batch_size: int = 3
+    instances_per_phase: int = 2
+    expected_output_size = (batch_size, 1, *tileshape)
+    instance_mapping = synthetic_dataset.instance_mapping
+    # We need to patch this since the instance mapping variable
+    # for the builder class is set at import-time
+    monkeypatch.setattr(setup, 'INSTANCE_MAPPING', value=instance_mapping)
+    monkeypatch.setattr(
+        woodnet.datasets.volumetric.BaseTileDatasetBuilder,
+        'instance_mapping',
+        value=instance_mapping
+    )
+    raw_configuration = """
+        loaders:
+            dataset: TileDataset
+            tileshape: [$TILESHAPE]
+            batchsize: $BATCH_SIZE
+            num_workers: 0
+            pin_memory: True
+
+            train:
+                instances_ID: [$TRAINING_ID]
+
+                transform_configurations:
+                    - name: Normalize
+                      mean: 110
+                      std: 950
+        
+            val:
+                instances_ID: [$VALIDATION_ID]
+
+                transform_configurations:
+                    - name: Normalize
+                      mean: 110
+                      std: 950
+    """
+    configuration = string.Template(raw_configuration)
+
+    # Generically select IDs and stuff them into the configuration template.
+    rng = np.random.default_rng()
+    IDs = np.array(list(instance_mapping.keys()))
+    train_ID, val_ID = rng.choice(IDs, size=(2, instances_per_phase), replace=False)
+    train_ID = ', '.join((str(c) for c in train_ID))
+    val_ID = ', '.join((str(c) for c in val_ID))
+
+    tileshape_str = ', '.join((str(d) for d in tileshape))
+
+    configuration = configuration.substitute(
+        {'TRAINING_ID': train_ID, 'VALIDATION_ID': val_ID,
+         'TILESHAPE' : tileshape_str, 'BATCH_SIZE' : str(batch_size)}
+    )
+    # Load config realistically via YAML parser.
     yaml = YAML(typ='safe')
-    with open('/home/jannik/code/woodnet/tests/assets/trainconf.yaml') as handle:
-        conf = yaml.load(handle)
+    conf = yaml.load(configuration)
 
+    # Core test.
     loaders = create_loaders(conf)
-
-    print(loaders)
+    
+    trainloader = loaders['train']
+    valloader = loaders['val']
+    train_data, train_label = next(iter(trainloader))
+    val_data, val_label = next(iter(valloader))
+    
+    # Shape of the data should be of the format (N, C, D, H, W)
+    assert train_data.shape == expected_output_size, (
+        f'train loader returned {train_data.shape} '
+        f'sized tensor, expected {expected_output_size}')
+    
+    assert val_data.shape == expected_output_size, (
+        f'val loader returned {val_data.shape} sized tensor, '
+        f'expected {expected_output_size}')
 
 
 
