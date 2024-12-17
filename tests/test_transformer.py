@@ -3,8 +3,8 @@ import pytest
 from monai.transforms.intensity.array import GaussianSmooth
 
 from woodnet.transformations.transformer import Transformer
-from woodnet.inference.parametrized_transforms import (generate_parametrized_transforms,
-                                                       ParametrizedTransform)
+from woodnet.inference.parametrized_transforms import generate_parametrized_transforms
+
 
 @pytest.fixture
 def smoothing_parametrized_transform():
@@ -20,8 +20,14 @@ def smoothing_parametrized_transform():
     return generate_parametrized_transforms(specification)
 
 
+def identity(x):
+    return x
+
+def oneify(x):
+    return x / x
+
+
 def test_with_single_identity_transform():
-    identity = lambda x: x
     transformer = Transformer(identity)
     x = torch.randn((1, 16, 16, 16))
     out = transformer(x)
@@ -29,7 +35,6 @@ def test_with_single_identity_transform():
 
 
 def test_with_single_oneify_transform():
-    oneify = lambda x: x / x
     transformer = Transformer(oneify)
     x = torch.randn((1, 16, 16, 16))
     out = transformer(x)
@@ -42,8 +47,7 @@ def test_with_parametrized_transform_in_init(smoothing_parametrized_transform):
     manual_smoother = GaussianSmooth(sigma=1.0)
     # this is the sigma = 1.0 parametrization of the GaussianSmoother
     smoother = smoothing_parametrized_transform[0]
-    identity = lambda x: x / x
-    transformer = Transformer(identity, parametrized_transform=smoother)
+    transformer = Transformer(oneify, parametrized_transform=smoother)
     x = torch.randn((1, 16, 16, 16))
     out = transformer(x)
     # The standard transform gets us an all-ones tensor on which the parametrized_transform
@@ -53,7 +57,6 @@ def test_with_parametrized_transform_in_init(smoothing_parametrized_transform):
 
 
 def test_correct_setting_and_logging_of_parametrized_transform(smoothing_parametrized_transform):
-    oneify = lambda x: x / x
     transformer = Transformer(oneify, oneify)
     for smoother in smoothing_parametrized_transform:
         transformer.parametrized_transform = smoother
