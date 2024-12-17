@@ -187,6 +187,8 @@ def noise_transforms() -> list[ParametrizedTransform]:
 def datasets(synthetic_dataset) -> list[TileDataset]:
     instance_mapping = synthetic_dataset.instance_mapping
     TileDatasetBuilder.instance_mapping = instance_mapping
+    TileDatasetBuilder.internal_path = synthetic_dataset.internal_path
+    TileDatasetBuilder.classlabel_mapping = synthetic_dataset.classlabel_mapping
     # desired number of datasets
     N: int = 3
     ID: list[str] = random.choices(list(instance_mapping.keys()), k=N)
