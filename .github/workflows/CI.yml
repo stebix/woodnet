@@ -2,6 +2,9 @@ name: woodnet package CI
 
 on: [push]
 
+env:
+  FORCE_COLOR: "1"
+
 jobs:
   test-linux:
     name: job-conda-(${{ matrix.python-version }}::${{ matrix.os }})
