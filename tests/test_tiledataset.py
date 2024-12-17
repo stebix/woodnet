@@ -16,7 +16,6 @@ import torch
 import pytest
 
 from woodnet.datasets.volumetric import TileDatasetBuilder, TileDataset
-from woodnet.transformations import from_configurations
 from woodnet.datasets.reader import ZarrReader
 
 
