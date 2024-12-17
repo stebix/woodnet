@@ -1,32 +1,26 @@
-name: Python Package using Conda
+name: woodnet package CI with conda
 
 on: [push]
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    name: job-conda-(${{ matrix.python-version }}::${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
-      max-parallel: 5
-
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.11", "3.12"]
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.10'
-    - name: Add conda to system path
-      run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
-        echo $CONDA/bin >> $GITHUB_PATH
-    - name: Install dependencies
-      run: |
-        conda env create --file environment-cpu.yaml
-    - name: Intialize conda at bash
-      run: |
-        source /home/runner/.bashrc
-        conda init
-    - name: Test with pytest
-      run: |
-        conda activate woodanalysis
-        conda install pytest
-        pytest -m "not usescuda"
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Conda info
+        shell: bash -el {0}
+        run: conda info
+
+      - uses: actions/checkout@v4
+
+
