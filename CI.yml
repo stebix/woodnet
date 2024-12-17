@@ -1,4 +1,4 @@
-name: woodnet package CI with conda
+name: woodnet package CI
 
 on: [push]
 
