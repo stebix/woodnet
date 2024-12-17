@@ -1,4 +1,3 @@
-import pytest
 from typing import Sequence
 
 from woodnet.logtools.dict.dict import RecursiveLoggedDict
