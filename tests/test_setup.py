@@ -11,7 +11,8 @@ from woodnet.datasets.setup import (DataConfiguration,
                                     retrieve_data_configuration_path,
                                     load_env_file)
 
-FPATH = Path('/home/jannik/code/woodnet/tests/assets/dataconf.yaml')
+TESTS_DIRECTORY = Path(__file__).parent
+FPATH = TESTS_DIRECTORY / 'assets/dataconf.yaml'
 
 @pytest.fixture
 def dataconf_raw():
@@ -19,6 +20,7 @@ def dataconf_raw():
 
 
 def test_load_data_configuration() -> None:
+    print(TESTS_DIRECTORY.resolve())
     dataconf = load_data_configuration(FPATH)
     rich.print(dataconf)
 
