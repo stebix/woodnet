@@ -25,11 +25,23 @@ def test_load_data_configuration() -> None:
     rich.print(dataconf)
 
 
-def test_load_env_file():
+def test_load_env_file(tmp_path):
     # TODO: dependent on local filesystem
-    env_file = Path('/home/jannik/code/woodnet/.env')
-    env = load_env_file(env_file)
-    rich.print(env)
+    env_file_location = tmp_path / '.env'
+    content = [
+        'DATA_CONFIGURATION_PATH=/path/to/dataconf.yaml\n'
+        'GREETINGS=Hello World\n'
+    ]
+
+    with env_file_location.open(mode='w') as handle:
+        for line in content:
+            handle.write(line)
+        
+    env = load_env_file(env_file_location)
+
+    assert env['DATA_CONFIGURATION_PATH'] == '/path/to/dataconf.yaml'
+    assert env['GREETINGS'] == 'Hello World'
+
 
 
 def test_correct_grouping(dataconf_raw):
