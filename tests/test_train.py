@@ -78,7 +78,7 @@ def test_create_loss():
 
 def test_create_loaders(synthetic_dataset, monkeypatch):
     tileshape: tuple[int, int, int] = (128, 128, 128)
-    batch_size: int = 3
+    batch_size: int = 2
     instances_per_phase: int = 2
     expected_output_size = (batch_size, 1, *tileshape)
     instance_mapping = synthetic_dataset.instance_mapping
@@ -90,16 +90,26 @@ def test_create_loaders(synthetic_dataset, monkeypatch):
         'instance_mapping',
         value=instance_mapping
     )
+    monkeypatch.setattr(
+        woodnet.datasets.volumetric.BaseTileDatasetBuilder,
+        'internal_path',
+        value=synthetic_dataset.internal_path
+    )
+    monkeypatch.setattr(
+        woodnet.datasets.volumetric.BaseTileDatasetBuilder,
+        'classlabel_mapping',
+        value=synthetic_dataset.classlabel_mapping
+    )
     raw_configuration = """
         loaders:
             dataset: TileDataset
-            tileshape: [$TILESHAPE]
+            tileshape: [ $TILESHAPE ]
             batchsize: $BATCH_SIZE
             num_workers: 0
             pin_memory: True
 
             train:
-                instances_ID: [$TRAINING_ID]
+                instances_ID: [ $TRAINING_ID ]
 
                 transform_configurations:
                     - name: Normalize
@@ -107,7 +117,7 @@ def test_create_loaders(synthetic_dataset, monkeypatch):
                       std: 950
         
             val:
-                instances_ID: [$VALIDATION_ID]
+                instances_ID: [ $VALIDATION_ID ]
 
                 transform_configurations:
                     - name: Normalize
@@ -133,6 +143,14 @@ def test_create_loaders(synthetic_dataset, monkeypatch):
     yaml = YAML(typ='safe')
     conf = yaml.load(configuration)
 
+    import rich
+    rich.print(configuration)
+    rich.print(synthetic_dataset.instance_mapping)
+
+    rich.print(IDs)
+    rich.print(train_ID)
+
+
     # Core test.
     loaders = create_loaders(conf)
     
@@ -140,7 +158,7 @@ def test_create_loaders(synthetic_dataset, monkeypatch):
     valloader = loaders['val']
     train_data, train_label = next(iter(trainloader))
     val_data, val_label = next(iter(valloader))
-    
+
     # Shape of the data should be of the format (N, C, D, H, W)
     assert train_data.shape == expected_output_size, (
         f'train loader returned {train_data.shape} '
