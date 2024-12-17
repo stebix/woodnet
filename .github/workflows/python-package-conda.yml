@@ -21,6 +21,9 @@ jobs:
     - name: Install dependencies
       run: |
         conda env create --file environment-cpu.yaml
+    - name: Intialize conda at bash
+      run: |
+        conda init
     - name: Test with pytest
       run: |
         conda activate woodanalysis
