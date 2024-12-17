@@ -3,10 +3,10 @@ import pytest
 
 from woodnet.datasets.setup import group_instances_by_class, convert_to_lists, InstanceFingerprint
 
-from woodnet.cvsplits import INSTANCES, WOOD_CLASSES, remap_group, StratifiedKFoldsGenerator
+from woodnet.cvsplits import StratifiedKFoldsGenerator
 
 from tests.scaffolding.syntheticdata import (ClassSpecification,
-                                             create_data_configuration, create_instance_informations)
+                                             create_data_configuration)
 
 @pytest.mark.skip
 def test(monkeypatch):
@@ -18,7 +18,7 @@ def test(monkeypatch):
     data_configuration = create_data_configuration(specs, base_location='path/to/data', internal_path='group/dset')
     instance_mapping = {k: InstanceFingerprint(**v) for k, v in data_configuration['instance_mapping'].items()}
 
-    instance_by_class = group_instances_by_class(instance_mapping, format='mapping')
+    _ = group_instances_by_class(instance_mapping, format='mapping')
 
     instances, classes, groups = convert_to_lists(instance_mapping)
 
@@ -32,30 +32,3 @@ def test(monkeypatch):
     
     rich.print(r)
 
-    raise KeyError
-
-    nid, ncl, ngr = convert_to_lists(INSTANCE_MAPPING)
-
-    rich.print(INSTANCES)
-    rich.print(WOOD_CLASSES)
-
-    old = {i : c for i, c in zip(INSTANCES, WOOD_CLASSES)}
-    new = {i : c for i, c in zip(nid, ncl)}
-
-    assert old == new
-
-    rich.print(nid)
-    rich.print(ncl)
-
-    mapping = {'axial' : 'axiallike', 'axial-tangential' : 'axiallike'}
-    remapped = remap_group(ngr,
-                           mapping=mapping)
-
-    rich.print(
-        [(pre, post) for pre, post in zip(ngr, remapped)]
-    )
-
-
-    generator = StratifiedKFoldsGenerator()
-
-    rich.print(generator[1])
