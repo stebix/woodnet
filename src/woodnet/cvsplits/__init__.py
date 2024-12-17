@@ -74,7 +74,7 @@ INSTANCES, CLASSES = zip(
 )
 INSTANCES = np.array(INSTANCES)
 CLASSES = np.array(CLASSES)
-WOOD_CLASSES, ORIENTATION_ClASSES = split_multiclass_identififers(CLASSES)
+WOOD_CLASSES, ORIENTATION_CLASSES = split_multiclass_identififers(CLASSES)
 
 
 class CVStrategy(enum.Enum):
@@ -171,7 +171,7 @@ class StratifiedGroupKFoldsGenerator(_Generator):
                                                     random_state=self.random_state)
         self._splits: dict[int, dict] = {}
 
-        foldgenerator = enumerate(self._generator.split(INSTANCES, CLASSES, groups=ORIENTATION_ClASSES), start=1)
+        foldgenerator = enumerate(self._generator.split(INSTANCES, CLASSES, groups=ORIENTATION_CLASSES), start=1)
         for foldnum, foldspec in foldgenerator:
             training, validation = foldspec
             self._splits[foldnum] = {
