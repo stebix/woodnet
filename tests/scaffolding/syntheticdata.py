@@ -128,6 +128,24 @@ BINARY_CLASS_SPEC: list[ClassSpecification] = [
     ClassSpecification(name='pinus', label=1, groups={'blue', 'green'}, instances_per_group=1),
 ]
 
+def extract_classlabel_mapping(specs: Sequence[ClassSpecification]) -> dict[str, int]:
+    """
+    Extract the class label mapping from the class specifications.
+    Raises a ValueError if the labels are inconsistent within a class.
+    """
+    classlabel_mapping = {}
+    for spec in specs:
+        label = classlabel_mapping.get(spec.name, None)
+        if label is None:
+            classlabel_mapping[spec.name] = spec.label
+        elif label == spec.label:
+            continue
+        else:
+            msg = (f'Inconsistent label for class \'{spec.name}\': got {label} '
+                   f'and encountered {spec.label}')
+            raise ValueError(msg)
+        
+    return classlabel_mapping
 
 
 @dataclass
@@ -140,6 +158,7 @@ class SyntheticDatasetPackage:
     base_directory: Path
     instance_mapping: dict[str, dict]
     data_configuration: dict[str, Any]
+    classlabel_mapping: dict[str, int]
 
 
 class SyntheticDatasetGenerator:
@@ -156,6 +175,7 @@ class SyntheticDatasetGenerator:
         self.raw_dimensions = raw_dimensions
         self.specs = specs
         self.cast_fingerprints = cast_fingerprints
+        self.classlabel_mapping = extract_classlabel_mapping(specs)
     
     @classmethod
     def from_defaults(cls) -> 'SyntheticDatasetGenerator':
@@ -183,7 +203,8 @@ class SyntheticDatasetGenerator:
 
         kwargs = {
             'internal_path' : self.internal_path, 'base_directory' : base_directory,
-            'instance_mapping' : instance_mapping, 'data_configuration' : data_configuration
+            'instance_mapping' : instance_mapping, 'data_configuration' : data_configuration,
+            'classlabel_mapping' : self.classlabel_mapping
         }
         return SyntheticDatasetPackage(**kwargs)
 
