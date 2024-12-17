@@ -627,6 +627,7 @@ improve. The following open points will be addressed in the near future:
 - [ ] Build as PyPI package to facilitate easier deployment for users
 - [ ] Improve and expand testing and testing coverage
 - [ ] Expand documentation on readthedocs
+- [ ] Add type checking for further code quality assurance 
 
 ### Bugs, Questions, Requests and Contributions
 
