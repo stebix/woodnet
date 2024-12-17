@@ -143,6 +143,7 @@ class Test_retrieve_trainer_class:
 
 
 
+@pytest.mark.usescuda
 @pytest.mark.integration
 def test_trainer_initialization(configuration,
                                 loaders,
