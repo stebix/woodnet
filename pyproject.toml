@@ -43,7 +43,8 @@ dependencies = [
   "pydantic",
   "pillow",
   "pytest",
-  "ruamel.yaml"
+  "ruamel.yaml",
+  "frozendict"
 ]
 
 [project.scripts]
