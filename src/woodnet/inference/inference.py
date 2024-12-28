@@ -227,7 +227,7 @@ def run_evaluation(basedir: Path,
                    display_parametrizations_progress: bool= True,
                    display_loader_progress: bool= True,
                    inject_early_to_device: bool = False
-                   ) -> None:
+                   ) -> dict:
     """
     Run full evaluation for a CV-fold training result and save
     the resulting dict in the newly create inference directory.
