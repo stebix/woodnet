@@ -36,6 +36,14 @@ logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 logger.info(f'Volumetric datasets are using internal path: {INTERNAL_PATH}')
 
 
+
+def log_data_setup_info():
+    logger.debug(f'Instance mapping available keys: {INSTANCE_MAPPING.keys()}')
+    return None
+
+
+
+
 class TileDataset(torch.utils.data.Dataset):
     """
     Dataset for 3D tile based loading of the data.
@@ -306,8 +314,10 @@ class BaseTileDatasetBuilder:
         try:
             fingerprint = cls.instance_mapping[ID]
         except KeyError:
-            raise FileNotFoundError(f'could not retrieve dataset instance with ID "{ID}" - '
-                                    f'check if ID is present in the data configuration!')
+            log_data_setup_info()
+            error_msg = (f'could not retrieve dataset instance with ID "{ID}" - '
+                         f'check if ID is present in the data configuration!')
+            raise FileNotFoundError(error_msg)
 
         return fingerprint.location
 
