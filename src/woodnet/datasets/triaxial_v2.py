@@ -19,7 +19,7 @@ from torch import Tensor
 
 from woodnet.datasets.setup import (InstanceFingerprint,
                                     INTERNAL_PATH, CLASSLABEL_MAPPING, INSTANCE_MAPPING)
-from woodnet.datasets.tiling import VolumeTileBuilder
+from woodnet.datasets.tiling import CylindricalVolumeTileBuilder
 from woodnet.custom.types import PathLike
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations
@@ -362,6 +362,7 @@ class TriaxialDataset(torchdata.Dataset):
                  reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
+                 tilegeneration_style: Literal['cylindrical', 'cuboidal'] = 'cylindrical'
                  ) -> None:
 
         super().__init__()
@@ -383,7 +384,11 @@ class TriaxialDataset(torchdata.Dataset):
         self.fingerprint = self.reader.load_fingerprint()
 
         self.baseshape = get_spatial_shape(self.volume.shape)
+
+        self.tilegeneration_style = tilegeneration_style
+
         self.tileshape, self.tiles = self._generate_tiles(tileshape)
+
         self.orthoplanes = self._generate_orthoplanes()
 
 
@@ -415,22 +420,29 @@ class TriaxialDataset(torchdata.Dataset):
             The actual tileshape and the slices that select the tiles
             from the full volume.
         """
-        if tileshape is None:
-            # generate maximally available tile with layout (0 : channel, 1 : axis0, 2 : axis1, 3 : axis2)
-            tile = generate_maximal_tile(self.baseshape, prepend_wildcards=1)
-            tiles = [tile]
-            tileshape = (
-                self.baseshape[0],
-                tile[2].stop - tile[2].start,
-                tile[3].stop - tile[3].start
-            )
+
+        if self.tilegeneration_style == 'cylindrical':
+            if tileshape is None:
+                # generate maximally available tile with layout (0 : channel, 1 : axis0, 2 : axis1, 3 : axis2)
+                tile = generate_maximal_tile(self.baseshape, prepend_wildcards=1)
+                tiles = [tile]
+                tileshape = (
+                    self.baseshape[0],
+                    tile[2].stop - tile[2].start,
+                    tile[3].stop - tile[3].start
+                )
+            else:
+                radius = self.baseshape[-1] // 2
+                builder = CylindricalVolumeTileBuilder(
+                    baseshape=self.baseshape, tileshape=tileshape,
+                    radius=radius
+                )
+                tiles = builder.tiles
+        elif self.tilegeneration_style == 'cuboidal':
+            pass
         else:
-            radius = self.baseshape[-1] // 2
-            builder = VolumeTileBuilder(
-                baseshape=self.baseshape, tileshape=tileshape,
-                radius=radius
-            )
-            tiles = builder.tiles
+            raise ValueError(f'invalid tile generation style \'{self.tilegeneration_style}\' - '
+                             f'only \'cylindrical\' and \'cuboidal\' are supported')
         return (tileshape, tiles)
     
     

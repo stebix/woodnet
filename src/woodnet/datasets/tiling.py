@@ -268,7 +268,7 @@ def compute_z_slices(a: int, z_increment: int, layers: int) -> list[slice]:
     return slices
 
 
-class VolumeTileBuilder:
+class CylindricalVolumeTileBuilder:
     """
     Compute tiles (i.e. cubic subvolumes) for a cylindrical region inside a 3D voxel volume.
     Individual tiles are stored as 3-tuples of slice objects with (z, {x, y}) axis ordering.
@@ -357,6 +357,10 @@ class VolumeTileBuilder:
                  'expected shape for {3,4,5}-D volume but got '
                 f'{len(shape)}-D volume'
             )
+
+
+class RectangularVolumeTileBuilder:
+    pass
 
 
 

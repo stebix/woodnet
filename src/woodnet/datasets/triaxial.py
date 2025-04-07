@@ -19,7 +19,7 @@ from torch import Tensor
 
 from woodnet.datasets.setup import (InstanceFingerprint,
                                     INTERNAL_PATH, CLASSLABEL_MAPPING, INSTANCE_MAPPING)
-from woodnet.datasets.tiling import VolumeTileBuilder
+from woodnet.datasets.tiling import CylindricalVolumeTileBuilder
 from woodnet.custom.types import PathLike
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations
@@ -426,7 +426,7 @@ class TriaxialDataset(torchdata.Dataset):
             )
         else:
             radius = self.baseshape[-1] // 2
-            builder = VolumeTileBuilder(
+            builder = CylindricalVolumeTileBuilder(
                 baseshape=self.baseshape, tileshape=tileshape,
                 radius=radius
             )
