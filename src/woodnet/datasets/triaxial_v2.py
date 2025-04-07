@@ -19,7 +19,7 @@ from torch import Tensor
 
 from woodnet.datasets.setup import (InstanceFingerprint,
                                     INTERNAL_PATH, CLASSLABEL_MAPPING, INSTANCE_MAPPING)
-from woodnet.datasets.tiling import CylindricalVolumeTileBuilder
+from woodnet.datasets.tiling import CylindricalVolumeTileBuilder, CuboidalVolumeTileBuilder
 from woodnet.custom.types import PathLike
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations
@@ -362,7 +362,8 @@ class TriaxialDataset(torchdata.Dataset):
                  reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
-                 tilegeneration_style: Literal['cylindrical', 'cuboidal'] = 'cylindrical'
+                 tilegeneration_style: Literal['cylindrical', 'cuboidal'] = 'cylindrical',
+                 fingerprint_path: Literal['root', 'internal'] = 'root',
                  ) -> None:
 
         super().__init__()
@@ -373,7 +374,7 @@ class TriaxialDataset(torchdata.Dataset):
         self.transformer = transformer
         self.classlabel_mapping = classlabel_mapping
         self.internal_path = internal_path
-        self.reader = self._init_reader(reader_class, path, internal_path)
+        self.reader = self._init_reader(reader_class, path, internal_path, fingerprint_path)
         
         if self.phase in {'train', 'val'} and classlabel_mapping is None:
             raise RuntimeError(f'Phase \'{self.phase}\' dataset requires a '
@@ -386,17 +387,29 @@ class TriaxialDataset(torchdata.Dataset):
         self.baseshape = get_spatial_shape(self.volume.shape)
 
         self.tilegeneration_style = tilegeneration_style
-
         self.tileshape, self.tiles = self._generate_tiles(tileshape)
-
         self.orthoplanes = self._generate_orthoplanes()
 
 
     @staticmethod
-    def _init_reader(reader_class: type[Reader] | None, path: PathLike, internal_path: str) -> Reader:
+    def _init_reader(
+        reader_class: type[Reader] | None,
+        path: PathLike,
+        internal_path: str,
+        fingerprint_path: Literal['root', 'internal'] = 'root'
+    ) -> Reader:
         if reader_class is None:
             reader_class = deduce_reader_class(path)
-        return reader_class(path=path, internal_path=internal_path)
+        
+        if fingerprint_path == 'root':
+            fingerprint_path = '/'
+        elif fingerprint_path == 'internal':
+            fingerprint_path = internal_path
+        else:
+            raise ValueError(f'Invalid fingerprint path \'{fingerprint_path}\' - '
+                             f'only \'root\' and \'internal\' are supported')
+        
+        return reader_class(path=path, internal_path=internal_path, fingerprint_path=fingerprint_path)
     
         
     def _generate_tiles(self,
@@ -439,7 +452,10 @@ class TriaxialDataset(torchdata.Dataset):
                 )
                 tiles = builder.tiles
         elif self.tilegeneration_style == 'cuboidal':
-            pass
+            builder = CuboidalVolumeTileBuilder(
+                baseshape=self.baseshape, tileshape=tileshape
+            )
+            tiles = builder.tiles
         else:
             raise ValueError(f'invalid tile generation style \'{self.tilegeneration_style}\' - '
                              f'only \'cylindrical\' and \'cuboidal\' are supported')
