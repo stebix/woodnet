@@ -34,7 +34,7 @@ dependencies = [
   "pandas",
   "matplotlib",
   "seaborn",
-  "zarr",
+  "zarr < 3",
   "h5py",
   "tqdm",
   "tensorboard",
