@@ -29,6 +29,9 @@ class Standoff(NamedTuple):
     x: float | int | None
 
 Tilespec3D: TypeAlias = tuple[slice, slice, slice]
+TilespecND: TypeAlias = tuple[slice, ...]
+Tileshape3D: TypeAlias = tuple[int, int, int]
+
 RelStandoff: TypeAlias = tuple[float | None, float | None, float | None]
 AbsStandoff: TypeAlias = tuple[int | None, int | None, int | None]
 
@@ -136,7 +139,7 @@ def compute_tiles_cuboidal(
     tileshape: tuple[int, int, int],
     rel_standoff: RelStandoff | None = None,
     abs_standoff: AbsStandoff | None = None
-) -> list[tuple[slice, slice, slice]]:
+) -> tuple[Tilespec3D, ...]:
     """
     Compute the tilespecs for tiles of the given shape filling the
     cuboidal volume with the given `volshape`.
@@ -264,8 +267,8 @@ class CuboidalVolumeTileBuilder:
     """
     def __init__(
         self,
-        baseshape: tuple[int],
-        tileshape: tuple[int],
+        baseshape: tuple[int, int, int],
+        tileshape: Tileshape3D,
         relative_standoff: RelStandoff | None = None,
         absolute_standoff: AbsStandoff | None = None,
         prepend_wildcards: int = 1
@@ -297,7 +300,7 @@ class CuboidalVolumeTileBuilder:
     @staticmethod
     def _prepend_wildcards(
         tilespecs: Sequence[Tilespec3D],
-        prepend_wildcards: int) -> list[Tilespec3D]:
+        prepend_wildcards: int) -> tuple[TilespecND, ...]:
         """
         Prepend wildcard (i.e. full selecting slice objects) for any
         generalized dimensions such as channel or batch.
