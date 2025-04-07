@@ -55,4 +55,8 @@ def test_provides_correct_orthoplane_shape(mock_instance_mapping, internal_path,
     assert label == 1701, 'picard is class acer and thus should have label 1701'
     _, *planeshape = element.shape
     assert element.shape == (3, *planeshape), f'orthoplane shape (3, ty, tx) but got {element.shape}'
-    
+
+
+
+class Test_TriaxialDataset:
+    pass
