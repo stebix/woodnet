@@ -21,7 +21,7 @@ logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 PathLike = Path | str
 
 
-def read_fingerprint_from_zarr(path: PathLike) -> dict:
+def read_fingerprint_from_zarr(path: PathLike, fingerprint_path: str) -> dict:
     """
     Read the fingerprint from a zarr file.
 
@@ -36,7 +36,7 @@ def read_fingerprint_from_zarr(path: PathLike) -> dict:
     dict : The fingerprint of the zarr file.
     """
     data = zarr.convenience.open(path, mode='r')
-    fingerprint = {k : v for k, v in data.attrs.items()}
+    fingerprint = {k : v for k, v in data[fingerprint_path].attrs.items()}
     return fingerprint
 
 
@@ -117,17 +117,25 @@ class Reader(abc.ABC):
 
 class ZarrReader(Reader):
     """Reader for zarr files."""
-    def __init__(self, path: PathLike, internal_path: str):
+    def __init__(
+        self,
+        path: PathLike,
+        internal_path: str,
+        fingerprint_path: str = '/'
+        ) -> None:
         self.path = path
         self.internal_path = internal_path
+        self.fingerprint_path = fingerprint_path
 
     def load_data(self) -> np.ndarray:
-        logger.debug(f'loading data from zarr file: {self.path}')
+        logger.debug(f'loading data from zarr file: {self.path} with '
+                     f'internal path: {self.internal_path}')
         return read_data_from_zarr(self.path, self.internal_path)
 
     def load_fingerprint(self) -> dict:
-        logger.debug(f'loading fingerprint from zarr file: {self.path}')
-        return read_fingerprint_from_zarr(self.path)
+        logger.debug(f'loading fingerprint from zarr file: {self.path} '
+                     f'@ internal path: {self.fingerprint_path}')
+        return read_fingerprint_from_zarr(self.path, self.fingerprint_path)
 
 
 
