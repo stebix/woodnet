@@ -243,7 +243,7 @@ class Trainer:
             self.running_train_loss.update(loss.item(), get_batchsize(data))
 
             if self.iteration % self.log_after_iters == 0:
-                self.on_log_iteration(prediction, label)
+                self.on_log_iteration(prediction, data, label)
 
             if self.iteration % self.validate_after_iters == 0:
                 self.on_validation_iteration()
@@ -268,7 +268,7 @@ class Trainer:
         return (False, None)
     
 
-    def on_log_iteration(self, prediction: Tensor, label: Tensor) -> None:
+    def on_log_iteration(self, prediction: Tensor, data: Tensor, label: Tensor) -> None:
         """
         Callback-like method performed on logging iterations.
         Logs weights and gradients, and logs and updates running metrics.
@@ -278,6 +278,9 @@ class Trainer:
 
         prediction : torch.Tensor
             Prediction tensor of current forward pass.
+
+        data : torch.Tensor
+            Input data tensor of model for current forward pass.
 
         label : torch.Tensor
             Label tensor of current forward pass.     
