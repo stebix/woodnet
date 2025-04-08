@@ -2,7 +2,7 @@ import logging
 
 from pathlib import Path
 from collections.abc import Iterable, Callable
-from typing import Literal, Union, TypeAlias, NamedTuple
+from typing import Literal, TypeAlias
 from functools import cached_property
 from itertools import product
 
@@ -24,39 +24,15 @@ from woodnet.datasets.setup import (InstanceFingerprint,
 from woodnet.custom.types import PathLike
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations
-
+from woodnet.datasets.triaxial.typespecs import(
+    Tilespec3D, TilespecND, Tileshape3D, Planespec3D, TriaxPlanesSpec, TilePlanespec3D
+)
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
 
 ArrayLike: TypeAlias = np.ndarray
-
-Tilespec3D: TypeAlias = tuple[slice, slice, slice]
-TilespecND: TypeAlias = tuple[slice, ...]
-Tileshape3D: TypeAlias = tuple[int, int, int]
-
-Planespec3D: TypeAlias = Union[
-    tuple[int, slice, slice],
-    tuple[slice, int, slice],
-    tuple[slice, slice, int]
-]
-
-
-class TriaxPlanesSpec(NamedTuple):
-    """Specification of the three orthogonal planes"""
-    zplane: Planespec3D
-    yplane: Planespec3D
-    xplane: Planespec3D
-
-
-class TilePlanespec3D(NamedTuple):
-    """
-    Jointly specify the tile index and the planes to extract from the tile.
-    """
-    tidx: int
-    triax_planespec: TriaxPlanesSpec
-
 
 
 

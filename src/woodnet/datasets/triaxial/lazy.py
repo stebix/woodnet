@@ -1,7 +1,7 @@
 import logging
 
 from pathlib import Path
-from typing import Callable, Literal, Union, TypeAlias, NamedTuple
+from typing import Callable, Literal, TypeAlias
 from functools import cached_property
 from itertools import product
 
@@ -15,33 +15,15 @@ import zarr.convenience
 
 from woodnet.datasets.reader import Reader, deduce_reader_class
 from woodnet.datasets.tiling import CylindricalVolumeTileBuilder, CuboidalVolumeTileBuilder
+from woodnet.datasets.triaxial.typespecs import (
+    Tilespec3D, TilespecND, Tileshape3D, Planespec3D
+)
+from woodnet.custom.types import PathLike
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
-
-PathLike: TypeAlias = str | Path
 ArrayLike: TypeAlias = np.ndarray
-
-Tilespec3D: TypeAlias = tuple[slice, slice, slice]
-TilespecND: TypeAlias = tuple[slice, ...]
-Tileshape3D: TypeAlias = tuple[int, int, int]
-
-Planespec3D: TypeAlias = Union[
-    tuple[int, slice, slice],
-    tuple[slice, int, slice],
-    tuple[slice, slice, int]
-]
-
-TriaxPlanes: TypeAlias = tuple[Planespec3D, Planespec3D, Planespec3D]
-
-class TilePlanespec3D(NamedTuple):
-    """
-    Jointly specify the tile index and the plane to extract from the tile.
-    """
-    tidx: int
-    planespec: Planespec3D
-
 
 
 def get_spatial_shape(shape: tuple[int, ...]) -> tuple[int, int, int]:
@@ -220,7 +202,7 @@ class LazyTriaxialDataset(torchdata.Dataset):
         Returns
         -------
         
-        (tileshape, tiles) : tuple of TileShape and list[TileSlice]
+        (tileshape, tiles) : tuple of Tileshape3D and list[TileSpecND]
             The actual tileshape and the slices that select the tiles
             from the full volume.
         """

@@ -24,14 +24,14 @@ from woodnet.custom.types import PathLike
 from woodnet.transformations.transformer import Transformer
 from woodnet.transformations.buildtools import from_configurations
 from woodnet.datasets.reader import Reader, deduce_reader_class
+from woodnet.datasets.triaxial.typespecs import Tileshape3D, Tilespec3D
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
 
 ArrayLike = np.ndarray | Tensor
-TileShape = tuple[int, int, int]
-TileSlice = tuple[slice, ...]
+
 
 
 def generate_plane_slice(axis: int, index: int) -> tuple[slice]:
@@ -358,7 +358,7 @@ class TriaxialDataset(torchdata.Dataset):
                  internal_path: str,
                  phase: Literal['train', 'val'],
                  planestride: tuple[int, int, int],
-                 tileshape: TileShape | None = None,
+                 tileshape: Tileshape3D | None = None,
                  reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
@@ -395,8 +395,8 @@ class TriaxialDataset(torchdata.Dataset):
     
         
     def _generate_tiles(self,
-                        tileshape: TileShape | None
-                        ) -> tuple[TileShape, list[TileSlice]]:
+                        tileshape: Tileshape3D | None
+                        ) -> tuple[Tileshape3D, list[Tilespec3D]]:
         """Generate the tiles as 3-tuples of slice objects.
         Selects the maximally available tile or the tile shape builder depending
         on input.
@@ -534,7 +534,7 @@ class TriaxialDatasetBuilder:
     def build(cls,
               instances_ID: Iterable[str],
               phase: Literal['train', 'val', 'test'],
-              tileshape: TileShape,
+              tileshape: Tileshape3D,
               planestride: tuple[int, int, int],
               transform_configurations: Iterable[dict] | None = None,
               **kwargs
@@ -552,7 +552,7 @@ class TriaxialDatasetBuilder:
         phase : Literal['train', 'val', 'test']
             Phase of the dataset: training, validation or testing.
 
-        tileshape : TileShape
+        tileshape : Tileshape3D
             Desired tileshape for the datasets.
 
         planestride : tuple[int, int, int]
