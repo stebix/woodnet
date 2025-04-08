@@ -20,6 +20,7 @@ def get_class(name: str) -> Type[torch.nn.Module]:
     """
     module_names = ('woodnet.transformations.transforms',
                     'woodnet.transformations.container',
+                    'woodnet.transformations.histomatch',
                     'torchvision.transforms')
     modules = [
         importlib.import_module(module_name)
