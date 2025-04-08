@@ -15,8 +15,6 @@ import tqdm
 from torch import Tensor
 import zarr.convenience
 
-import line_profiler
-
 from woodnet.datasets.reader import Reader, deduce_reader_class
 from woodnet.datasets.tiling import CylindricalVolumeTileBuilder, CuboidalVolumeTileBuilder
 from woodnet.datasets.tiling.utils import is_square
@@ -372,7 +370,6 @@ class LazyCachingTriaxialDataset(torchdata.Dataset):
         return np.stack((volume[zplane], volume[yplane], volume[xplane]), axis=0)
 
 
-    @line_profiler.profile
     def __getitem__(self, index: int) -> tuple[Tensor] | Tensor:
         """
         Retrieve dataset item: tuple of tensor for training phase
