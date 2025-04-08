@@ -36,6 +36,23 @@ class ParameterLogger(Protocol):
         pass
 
 
+def get_expanded_phase(phase: str) -> Literal['train', 'val', 'test']:
+    """
+    Expand the phase string to a full phase name.
+    """
+    abbrev2full = {
+        'train': 'train',
+        'val': 'validation',
+        'test': 'testing'
+    }
+    try:
+        return abbrev2full[phase]
+    except KeyError:
+        logger.warning(f'Unknown phase abbreviation: {phase}')
+        return phase
+    
+
+
 class Trainer:
     """
     New modern and shiny trainer.
@@ -68,7 +85,8 @@ class Trainer:
                  parameter_logger: ParameterLogger | None,
                  grad_clipping: Mapping | None = None,
                  leave_total_progress: bool | None = None,
-                 name: str = 'notset'
+                 name: str = 'notset',
+                 test_every_n_validation_iters: int | None = None,
                  ) -> None:
 
         self.model = model
@@ -82,6 +100,7 @@ class Trainer:
         
         self.train_loader = loaders.get('train')
         self.val_loader = loaders.get('val')
+        self.test_loader = loaders.get('test')
 
         self.validation_criterion = validation_criterion
         self.handler = handler
@@ -96,12 +115,14 @@ class Trainer:
         self.max_num_iters = max_num_iters
         self.epoch: int = 0
         self.iteration: int = 1
+        self.validation_iteration: int = 0
 
         self.running_train_loss = TrackedScalar()
         self.running_train_metrics = TrackedCardinalities()
 
         self.log_after_iters = log_after_iters
         self.validate_after_iters = validate_after_iters
+        self.test_every_n_validation_iters = test_every_n_validation_iters
         self.save_model_checkpoint_every_n = save_model_checkpoint_every_n
         self.parameter_logger = parameter_logger
 
@@ -285,7 +306,7 @@ class Trainer:
 
     def log_tracked_cardinalities(self,
                                   tracked_cardinalities: TrackedCardinalities,
-                                  phase: Literal['train', 'val']) -> None:
+                                  phase: Literal['train', 'val', 'test']) -> None:
         """
         Log tracked cardinalities to tensorboard.
         Applies phase-specific prefix to the metric names to structure tensorboard tags.
@@ -296,10 +317,10 @@ class Trainer:
         tracked_cardinalities : TrackedCardinalities
             Tracked cardinalities object containing the metrics.
 
-        phase : Literal['train', 'val']
-            Phase of the training process, either 'train' or 'val'.        
+        phase : Literal['train', 'val', 'test]
+            Phase context of logging action, either 'train', 'val' or 'test'        
         """
-        phase = 'training' if phase == 'train' else 'validation'
+        phase = get_expanded_phase(phase)
         for name in tracked_cardinalities.joint_identifiers:
             tag = f'{phase}_metrics/{name}'
             value = getattr(tracked_cardinalities, name)
@@ -310,7 +331,94 @@ class Trainer:
         """Callback-like method performed on validation iterations."""
         self.model.eval()
         self.validate(self.val_loader)
+        self.validation_iteration += 1
+        self.on_test_iteration()
         self.model.train()
+
+
+    def on_test_iteration(self) -> None:
+        """
+        Callback-like method performed on test iterations.
+        """
+        if self.is_test_iteration():
+            if self.test_loader is None:
+                msg = (f'Testing requested with interval {self.test_every_n_validation_iters} '
+                       f'but no test data loader set. Skipping test iteration.')
+                self.logger.warning(msg)
+                return
+            
+            self.logger.info('Encountered test iteration: testing model on arbitrary data')
+            self.test(self.test_loader)
+
+
+    def is_test_iteration(self) -> bool:
+        """
+        Check if the current iteration is a test iteration.
+        """
+        if self.test_every_n_validation_iters is None:
+            return False
+        return self.validation_iteration % self.test_every_n_validation_iters == 0
+
+
+    def test(self, loader: DataLoader) -> None:
+        device = self.device
+        dtype = self.dtype
+        criterion = self.validation_criterion
+        wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='testing', leave=False)
+        running_test_loss = TrackedScalar()
+        running_test_metrics = TrackedCardinalities()
+        self.logger.debug('Entering testing loop')
+
+        with self.disabled_gradient_context():
+            for batch_idx, batch_data in enumerate(wrapped_loader):
+                data, label = batch_data
+                data = data.to(device=device, dtype=dtype, non_blocking=True)
+                label = label.to(device=device, dtype=dtype, non_blocking=True)
+
+                prediction, loss = self.forward_pass(data, label, criterion)
+                running_test_loss.update(loss.item(), get_batchsize(data))
+                
+                if hasattr(self.model, 'final_nonlinearity'):
+                    prediction = self.model.final_nonlinearity(prediction)
+
+                cardinalities = compute_cardinalities(prediction, label)
+
+                # TODO: REMOVE after debugging
+                try:
+                    running_test_metrics.update(cardinalities)
+                except (TypeError, ValueError, RuntimeError) as e:
+
+                    import traceback
+                    logger.error(
+                        f'Failed to update running test metrics with cardinalities '
+                        f'{cardinalities}. TP = {cardinalities.TP} | FP = {cardinalities.FP}'
+                        f'FP = {cardinalities.FP} | FN = {cardinalities.FN} || '
+                        f'error = \'{e}\''
+                    )
+                    logger.error(
+                        f'traceback : \'{traceback.format_tb(e.__traceback__)}\''
+                    )
+                    logger.error(
+                        f'Runnning test metrics state dict: '
+                        f'\'{running_test_metrics.state_dict()}\''
+                    )
+
+                # TODO: REMOVE END #############################################
+        
+        # report results
+        loss_tag = f'loss/testing_{criterion.__class__.__name__}'
+        self.writer.add_scalar(loss_tag, running_test_loss.value,
+                               global_step=self.iteration)
+        self.log_tracked_cardinalities(running_test_metrics, 'test')
+        self.logger.debug(f'Concluded testing run with loss: {running_test_loss.value}')
+
+        # save optimal model checkpoint if validation metric value is optimal
+        metric_value = getattr(running_test_metrics, self.validation_metric)
+        self.logger.debug(
+            f'Concluded testing run with primary metric '
+            f'\'{self.validation_metric}\' = {metric_value}'
+        )
+        return None
 
 
     def disabled_gradient_context(self):
