@@ -176,6 +176,7 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
     num_workers = logged.pop(loaders_config, key='num_workers', default=1)
     pin_memory = logged.pop(loaders_config, key='pin_memory', default=False)
     batchsize = logged.pop(loaders_config, key='batchsize', default=1)
+    persistent_workers = logged.pop(loaders_config, key='persistent_workers', default=False)
 
     # residual key-value pairs must be admissible for builder.build method
     residual_kwargs = loaders_config
@@ -191,7 +192,8 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
 
         loader = torch.utils.data.DataLoader(
             dataset, batch_size=batchsize, num_workers=num_workers,
-            shuffle=shuffle, pin_memory=pin_memory
+            shuffle=shuffle, pin_memory=pin_memory,
+            persistent_workers=persistent_workers
         )
         loaders[phase] = loader
 
