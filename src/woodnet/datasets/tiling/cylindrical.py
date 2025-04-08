@@ -5,10 +5,17 @@ Jannik Stebani 2023
 """
 import numpy as np
 
-from typing import Iterable
+from typing import Iterable, TypeAlias
 from math import sqrt
 
 from woodnet.datasets.tiling.utils import is_square, is_3D
+
+
+Tilespec3D: TypeAlias = tuple[slice, slice, slice]
+TilespecND: TypeAlias = tuple[slice, ...]
+Tileshape3D: TypeAlias = tuple[int, int, int]
+
+
 
 def mask_inside_circle(i, j, radius, shape):
     i_off = shape[0] // 2
@@ -252,12 +259,12 @@ class CylindricalVolumeTileBuilder:
     Parameters
     ----------
     
-    baseshape: tuple of int
+    baseshape: tuple[int, int, int]
         Shape of the basal embedding voxel volume. 
         The volume must be square for the {x, y} dimensions,
         e.g. (950, 1200, 1200).
         
-    tileshape : tuple of int
+    tileshape : Tileshape3D
         Shape of a square tile subvolume, e.g. (256, 256, 256)
         
     radius : int
@@ -273,8 +280,13 @@ class CylindricalVolumeTileBuilder:
     radius_atol: int = 10
     packing_reltol: float = 0.01
     
-    def __init__(self, baseshape: tuple[int], tileshape: tuple[int], radius: int,
-                 prepend_wildcards: int = 1):
+    def __init__(
+        self,
+        baseshape: tuple[int, int, int],
+        tileshape: Tileshape3D,
+        radius: int,
+        prepend_wildcards: int = 1
+    ) -> None:
         
         for shape, dims in zip((baseshape, tileshape), ((1, 2), None)):
             if not is_3D(shape):
@@ -298,7 +310,7 @@ class CylindricalVolumeTileBuilder:
     
     
     @property
-    def tiles(self) -> list[slice]:
+    def tiles(self) -> list[TilespecND]:
         pattern = retrieve_pattern(self.a, self.radius, self.packing_reltol)
         vertex_coordinates = compute_vertex_coordinates(pattern, self.a, self.radius)
         tile_slices = compute_tiles(*vertex_coordinates)
