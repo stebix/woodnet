@@ -76,7 +76,9 @@ class ResNet18(torch.torch.nn.Module):
                  block: Type[ResNetBlock] = ResNetBlock,
                  final_nonlinearity: str = 'sigmoid',
                  final_nonlinearity_kwargs: dict | None = None,
-                 testing: bool = False) -> None:
+                 testing: bool = False,
+                 dropout: float | None = None
+    ) -> None:
         super(ResNet18, self).__init__()
 
         self.logger = '.'.join((MODULE_LOGGER_NAME, self.__class__.__name__))
@@ -101,7 +103,7 @@ class ResNet18(torch.torch.nn.Module):
         self.layer_2 = self._make_layer(block, 128, self.layers[1], stride=2)
         self.layer_3 = self._make_layer(block, 256, self.layers[2], stride=2)
         self.layer_4 = self._make_layer(block, 512, self.layers[3], stride=2)
-
+        self.dropout = torch.nn.Dropout(dropout) if dropout else None
         self.avgpool = torch.nn.AdaptiveAvgPool2d((1, 1))
         self.fc = torch.nn.Linear(512*self.expansion, self.num_classes)
         
@@ -149,6 +151,8 @@ class ResNet18(torch.torch.nn.Module):
         x = self.layer_3(x)
         x = self.layer_4(x)
         x = self.avgpool(x)
+        if self.dropout is not None:
+            x = self.dropout(x)
         x = torch.flatten(x, start_dim=1)
         x = self.fc(x)
 
