@@ -165,6 +165,7 @@ class LazyCachingTriaxialDataset(torchdata.Dataset):
                  phase: Literal['train', 'val', 'test'],
                  planestride: tuple[int, int, int],
                  tileshape: Tileshape3D | None = None,
+                 max_tile_count: int | None = None,
                  reader_class: type[Reader] | None = None,
                  transformer: Callable | None = None,
                  classlabel_mapping: dict[str, int] | None = None,
@@ -196,6 +197,7 @@ class LazyCachingTriaxialDataset(torchdata.Dataset):
             zarr.convenience.open(self.path, mode='r')[self.internal_path].shape
         )
 
+        self.max_tile_count = max_tile_count
         self.tilegeneration_style = tilegeneration_style
         self.tileshape, self.tiles = self._generate_tiles(tileshape)
 
@@ -279,6 +281,17 @@ class LazyCachingTriaxialDataset(torchdata.Dataset):
         else:
             raise ValueError(f'invalid tile generation style \'{self.tilegeneration_style}\' - '
                              f'only \'cylindrical\' and \'cuboidal\' are supported')
+        
+        logger.info(
+            f'Generated {len(tiles)} tiles with shape {tileshape} from '
+            f'{self.baseshape} with data source \'{self.path}\''
+        )
+        if self.max_tile_count is not None:
+            if len(tiles) > self.max_tile_count:
+                logger.info(f'Number of tiles ({len(tiles)}) exceeds max tile count ({self.max_tile_count}) - '
+                            f'truncating to {self.max_tile_count} tiles')
+                tiles = tiles[:self.max_tile_count]
+
         return (tileshape, tiles)
     
     
@@ -313,7 +326,7 @@ class LazyCachingTriaxialDataset(torchdata.Dataset):
         start = time.time()
         tilevolume = zarr.convenience.open(self.path, mode='r')[self.internal_path][*tile]
         end = time.time()
-        print(f'Loading tile took {end - start:.3f}s')
+        logger.debug(f'Loading tile took {end - start:.3f}s')
 
         # TODO: improve this: for triaxial channel is along the orthoplanes
         tilevolume = np.squeeze(tilevolume)
