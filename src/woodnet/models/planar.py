@@ -99,6 +99,7 @@ class ResNet18(torch.torch.nn.Module):
                                       bias=False
         )
         normalization_class = fetch_normalization_class(norm_type, self._dimensionality)
+        self._norm_type = norm_type
         self.norm_1 = normalization_class(self.conv_1_channels)
         self.relu = torch.nn.ReLU(inplace=True)
         self.maxpool = torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -113,7 +114,6 @@ class ResNet18(torch.torch.nn.Module):
         
         kwargs = final_nonlinearity_kwargs or {}
         self.final_nonlinearty = create_activation(final_nonlinearity, **kwargs)
-        self._norm_type = norm_type
 
 
     def _make_layer(
