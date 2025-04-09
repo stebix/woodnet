@@ -21,7 +21,8 @@ def get_class(name: str) -> Type[torch.nn.Module]:
     module_names = ('woodnet.transformations.transforms',
                     'woodnet.transformations.container',
                     'woodnet.transformations.histomatch',
-                    'torchvision.transforms')
+                    'torchvision.transforms',
+                    'monai.transforms')
     modules = [
         importlib.import_module(module_name)
         for module_name in module_names
