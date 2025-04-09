@@ -117,24 +117,24 @@ class ResNetBlock(torch.torch.nn.Module):
                                  padding=1,
                                  bias=False
         )
-        self.bn_1 = norm_class(out_channels)
+        self.norm_1 = norm_class(out_channels)
         self.relu = torch.nn.ReLU(inplace=True)
         self.conv_2 = conv_class(out_channels, out_channels*self.expansion, 
                                  kernel_size=3, 
                                  padding=1,
                                  bias=False
         )
-        self.bn_2 = norm_class(out_channels*self.expansion)
+        self.norm_2 = norm_class(out_channels*self.expansion)
 
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
         # progress through the varying operations
         out = self.conv_1(x)
-        out = self.bn_1(out)
+        out = self.norm_1(out)
         out = self.relu(out)
         out = self.conv_2(out)
-        out = self.bn_2(out)
+        out = self.norm_2(out)
         if self.downsample is not None:
             identity = self.downsample(x)
         out = out + identity
