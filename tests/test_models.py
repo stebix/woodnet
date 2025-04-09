@@ -1,6 +1,7 @@
 import sys
 import torch
 
+import numpy as np
 import pytest
 
 from woodnet.models import (create_model, collect_custom_model_modules,
@@ -52,28 +53,32 @@ def test_get_model_from_custom_module(tmp_path):
     assert model_class1.__name__ == 'ModelDummy1_Picard'
 
 
+class Test_2D_ResNet18_via_create_model:
 
-def test_2D_ResNet18_via_create_model():
-    """Basic smoke test if model creation and forward pass go through."""
-    in_channels = 1
-    out_channels = 1
-    batch_size = 3
-    size = (batch_size, in_channels, 256, 256)
-    inputs = torch.randn(size=size)
+    @pytest.mark.parametrize('dropout', [None, 0.5, 0.1337])
+    def test_basic_smoke(self, dropout):
+        """Basic smoke test if model creation and forward pass go through."""
+        in_channels = 1
+        out_channels = 1
+        batch_size = 3
+        size = (batch_size, in_channels, 256, 256)
+        inputs = torch.randn(size=size)
 
-    model_conf = {
-        'name' : 'ResNet18',
-        'in_channels' : in_channels
-    }
-    # create_model expects a top-level configuration dictionary with a 'model' key
-    conf = {'model' : model_conf}
-    model = create_model(conf)
+        model_conf = {
+            'name' : 'ResNet18',
+            'in_channels' : in_channels,
+            'dropout' : dropout
+        }
+        # create_model expects a top-level configuration dictionary with a 'model' key
+        conf = {'model' : model_conf}
+        model = create_model(conf)
 
-    with torch.no_grad():
-        prediction = model(inputs)
-    
-    assert prediction.shape[0] == batch_size
-    assert prediction.shape[1] == out_channels
+        with torch.no_grad():
+            prediction = model(inputs)
+        
+        assert prediction.shape[0] == batch_size
+        assert prediction.shape[1] == out_channels
+        assert np.isclose(model.dropout.p, dropout) if dropout else model.dropout is None
 
 
 
