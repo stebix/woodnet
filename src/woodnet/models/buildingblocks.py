@@ -23,6 +23,29 @@ def fetch_batchnorm_class(dimensionality: str) -> torch.nn.Module:
         raise ValueError(f'invalid dimensionality: "{dimensionality}"')
 
 
+def fetch_normalization_class(
+    name: str,
+    dimensionality: str
+) -> type[torch.nn.Module]:
+    normalizations = {
+        'batch' : {'2D' : torch.nn.BatchNorm2d,
+                   '3D' : torch.nn.BatchNorm3d},
+        'instance' : {'2D' : torch.nn.InstanceNorm2d,
+                      '3D' : torch.nn.InstanceNorm3d},
+        'layer' : {'2D' : torch.nn.LayerNorm,
+                   '3D' : torch.nn.LayerNorm},
+        'group' : {'2D' : torch.nn.GroupNorm,
+                   '3D' : torch.nn.GroupNorm}
+    }
+    try:
+        class_ = normalizations[name][dimensionality]
+    except KeyError:
+        msg = (f'invalid normalization name: \'{name}\' or dimensionality '
+               f'\'{dimensionality}\'. Supported norms: {normalizations.keys()} '
+               f'and dimensionalities: \'2D\' and \'3D\'.')
+        raise ValueError(msg)
+    return class_
+
 
 def create_activation(name: str, **kwargs):
     """
@@ -59,7 +82,7 @@ def create_activation(name: str, **kwargs):
         class_ = mapping[name]
     except AttributeError:
         raise ValueError(f'Invalid activation function name: \'{name}\'. '
-                         f'Must be o eof {mapping.keys()}')
+                         f'Must be one of {mapping.keys()}')
     return class_(**kwargs)
 
 
@@ -74,12 +97,13 @@ class ResNetBlock(torch.torch.nn.Module):
                  stride: int = 1,
                  expansion: int = 1,
                  downsample: Optional[torch.torch.nn.Module] = None,
+                 norm: Literal['batch', 'instance', 'group'] = 'batch',
                  dimensionality: Literal['2D', '3D'] = '2D',
                  ) -> None:
         super(ResNetBlock, self).__init__()
 
         conv_class = fetch_convolution_class(dimensionality)
-        norm_class = fetch_batchnorm_class(dimensionality)
+        norm_class = fetch_normalization_class(norm, dimensionality)
 
 
         # Multiplicative factor for the subsequent
