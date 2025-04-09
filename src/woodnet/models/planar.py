@@ -1,8 +1,10 @@
 import torch
 
-from typing import Type
+from typing import Type, Literal
 
-from woodnet.models.buildingblocks import ResNetBlock, create_activation
+from woodnet.models.buildingblocks import (
+    ResNetBlock, create_activation, fetch_normalization_class
+)
 
 Tensor = torch.Tensor
 
@@ -77,7 +79,8 @@ class ResNet18(torch.torch.nn.Module):
                  final_nonlinearity: str = 'sigmoid',
                  final_nonlinearity_kwargs: dict | None = None,
                  testing: bool = False,
-                 dropout: float | None = None
+                 dropout: float | None = None,
+                 norm_type: Literal['batch', 'instance', 'group'] = 'batch',
     ) -> None:
         super(ResNet18, self).__init__()
 
@@ -95,7 +98,8 @@ class ResNet18(torch.torch.nn.Module):
                                       padding=3,
                                       bias=False
         )
-        self.bn_1 = torch.nn.BatchNorm2d(self.conv_1_channels)
+        normalization_class = fetch_normalization_class(norm_type, self._dimensionality)
+        self.norm_1 = normalization_class(self.conv_1_channels)
         self.relu = torch.nn.ReLU(inplace=True)
         self.maxpool = torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
@@ -109,10 +113,17 @@ class ResNet18(torch.torch.nn.Module):
         
         kwargs = final_nonlinearity_kwargs or {}
         self.final_nonlinearty = create_activation(final_nonlinearity, **kwargs)
+        self._norm_type = norm_type
 
 
-    def _make_layer(self, block: Type[ResNetBlock], out_channels: int,
-                    blocks: int, stride: int = 1) -> torch.nn.Sequential:
+    def _make_layer(
+            self,
+            block: Type[ResNetBlock],
+            out_channels: int,
+            blocks: int,
+            stride: int = 1
+    ) -> torch.nn.Sequential:
+        normalization_class = fetch_normalization_class(self._norm_type, self._dimensionality)
         downsample = None
         if stride != 1:
             downsample = torch.nn.Sequential(
@@ -123,12 +134,14 @@ class ResNet18(torch.torch.nn.Module):
                     stride=stride,
                     bias=False 
                 ),
-                torch.nn.BatchNorm2d(out_channels * self.expansion),
+                normalization_class(out_channels * self.expansion),
             )
         layers = []
         layers.append(
             block(
-                self.in_channels, out_channels, stride, self.expansion, downsample
+                self.in_channels, out_channels, stride, self.expansion,
+                downsample=downsample, norm=self._norm_type,
+                dimensionality=self._dimensionality
             )
         )
         self.in_channels = out_channels * self.expansion
@@ -136,14 +149,16 @@ class ResNet18(torch.torch.nn.Module):
             layers.append(block(
                 self.in_channels,
                 out_channels,
-                expansion=self.expansion
+                expansion=self.expansion,
+                norm=self._norm_type,
+                dimensionality=self._dimensionality
             ))
         return torch.nn.Sequential(*layers)
     
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.conv_1(x)
-        x = self.bn_1(x)
+        x = self.norm_1(x)
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.layer_1(x)
