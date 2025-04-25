@@ -21,6 +21,8 @@ from woodnet.logtools.tensorboard.modelparameters.loggers import create_paramete
 from woodnet.checkpoint.registry import create_score_registry
 from woodnet.gradtools.clipping import create_gradclip_func
 
+from woodnet.evaluation.metrics import compute_ACC, compute_TNR, compute_TPR
+
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -298,6 +300,19 @@ class Trainer:
 
             cardinalities = compute_cardinalities(prediction, label)
             self.running_train_metrics.update(cardinalities)
+
+            # TODO: Fine grained debugging, remove in production
+            acc = compute_ACC(TP=cardinalities.TP,
+                              TN=cardinalities.TN,
+                              FP=cardinalities.FP,
+                              FN=cardinalities.FN)
+            tpr = compute_TPR(TP=cardinalities.TP,
+                              FN=cardinalities.FN)
+            tnr = compute_TNR(TN=cardinalities.TN,
+                              FP=cardinalities.FP)
+            self.writer.add_scalar('train/iter_ACC', scalar_value=acc, global_step=self.iteration)
+            self.writer.add_scalar('train/iter_TPR', scalar_value=tpr, global_step=self.iteration)
+            self.writer.add_scalar('train/iter_TNR', scalar_value=tnr, global_step=self.iteration)
         
         # report training metrics
         self.log_tracked_cardinalities(self.running_train_metrics, 'train')
