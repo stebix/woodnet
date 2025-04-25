@@ -5,8 +5,11 @@ import warnings
 import tqdm.auto as tqdm
 
 from copy import deepcopy
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
+
+import attrs
 
 import woodnet.logtools.dict.ops as logged 
 
@@ -202,6 +205,82 @@ def create_loaders(configuration: dict) -> dict[str, torch.utils.data.DataLoader
 
     return loaders
 
+
+@attrs.define
+class PhaseElements:
+    """
+    Elements necessary to create a DataLoader for a specific phase.
+    """
+    datasets: Sequence[torch.utils.data.Dataset]
+    loader_settings: dict[str, Any]
+
+
+@attrs.define
+class PhaseDatasets:
+    """
+    Container to hold prepared datasets for train and validation phases
+    together with the DataLoader settings.
+
+    Intended as output for the ``create_datasets`` function.
+    """
+    training: PhaseElements
+    validation: PhaseElements
+
+
+def create_datasets(configuration: dict) -> PhaseDatasets:
+    """
+    Create training and validation datasets from top-level config and return remaining
+    DataLoader settings.
+    
+    Note: This function is meant to represent an intermediate step with respect to
+          the function ``create_loaders``.
+          Intended to be used for debugging purposes.   
+    """
+    if 'loaders' not in configuration:
+        raise ConfigurationError('missing required loaders subconfiguration')
+
+    loaders_config = deepcopy(configuration['loaders'])
+    # differentiate subconfigurations and mutate
+    # residual key - value pairs must be valid for dataset builder build method
+    phase_configs = {phase : loaders_config.pop(phase) for phase in ('train', 'val')}
+    check_ID_overlap(phase_configs)
+    name = loaders_config.pop('dataset')
+    # torch data loader settings
+    num_workers = logged.pop(loaders_config, key='num_workers', default=1)
+    pin_memory = logged.pop(loaders_config, key='pin_memory', default=False)
+    batchsize = logged.pop(loaders_config, key='batchsize', default=1)
+    persistent_workers = logged.pop(loaders_config, key='persistent_workers', default=False)
+    default_prefetch_factor = 2 if num_workers > 0 else None
+    prefetch_factor = logged.pop(loaders_config, key='prefetch_factor', default=default_prefetch_factor)
+
+    # residual key-value pairs must be admissible for builder.build method
+    residual_kwargs = loaders_config
+
+    builder = get_builder_class(name)()
+    
+    phase_elements = {}
+
+    for phase, conf in phase_configs.items():
+
+        conf |= residual_kwargs | {'phase' : phase}
+        datasets = builder.build(**conf)
+        loader_kwargs = {
+            'shuffle' : True if phase == 'train' else False,
+            'batch_size' : batchsize,
+            'num_workers' : num_workers,
+            'pin_memory' : pin_memory,
+            'persistent_workers' : persistent_workers,
+            'prefetch_factor' : prefetch_factor
+        }
+        phase_elements[phase] = PhaseElements(
+            datasets=datasets, loader_settings=loader_kwargs
+        )
+    
+    phase_datasets = PhaseDatasets(
+        training=phase_elements['train'],
+        validation=phase_elements['val']
+    )
+    return phase_datasets
 
 
 def get_trainer_class(configuration: dict) -> TrainerClass:
