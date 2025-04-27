@@ -6,9 +6,10 @@ Jannik Stebani 2023
 import logging
 import torch
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 
 from woodnet.inference.parametrized_transforms import ParametrizedTransform
+from woodnet.transformations.buildtools import from_configurations
 
 TensorTransform = Callable[[torch.Tensor], torch.Tensor] | torch.nn.Module
 
@@ -35,13 +36,6 @@ class Transformer:
 
         return x
 
-
-    def __str__(self) -> str:
-        info_str = ''.join((self.__class__.__name__, '('))
-        info_str += f'N={len(self.transforms)}'
-        info_str += f'parametrized_transform={self.parametrized_transform}'
-        return ''.join((info_str, ')'))
-        
 
     @property
     def parametrized_transform(self) -> ParametrizedTransform:
@@ -90,6 +84,34 @@ class Transformer:
             raise TypeError(f'Expected callable, but got {type(transform)}!')
         self.transforms.insert(0, transform)
         logger.debug(f'Prepended new transform: {transform}.')
+
+
+    @classmethod
+    def from_configurations(cls, configurations: Sequence[Mapping]) -> 'Transformer':
+        """
+        Create a Transformer instance from a list of configuration
+        dictionaries.
+        """
+        if configurations is None:
+            configurations = []
+        transforms = from_configurations(configurations)
+        return cls(*transforms)
+
+
+    def __repr__(self) -> str:
+        format_string = self.__class__.__name__
+        format_string += '(\n'
+        format_string += f'  parametrized_transform={self.parametrized_transform},\n'
+        format_string +=  '  transforms=\n    ['
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += f'        {t}'
+        format_string += '\n    ]\n)'
+        return format_string
+
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 class ScriptedTransformer:
