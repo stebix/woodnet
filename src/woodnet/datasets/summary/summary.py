@@ -153,6 +153,10 @@ class ZarrArrayProxy:
 
 
 def sanitize_name(s: str) -> str:
+    """
+    Cannot use dashes in attribute names,
+    so simply replace all with underscores.
+    """
     return s.replace('-', '_')
 
 
