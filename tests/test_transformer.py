@@ -69,3 +69,12 @@ def test_correct_setting_and_logging_of_parametrized_transform(smoothing_paramet
         # should be applied. This is a Gaussian smooth with variable sigma.
         expected_out = manual_smoother(torch.ones_like(out))
         assert torch.allclose(out, expected_out)
+
+
+def test_empty_transformer_is_noop():
+    transformer = Transformer()
+    x = torch.randn((1, 16, 16, 16))
+    out = transformer(x)
+    assert torch.allclose(x, out)
+
+
