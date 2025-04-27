@@ -78,3 +78,8 @@ def test_empty_transformer_is_noop():
     assert torch.allclose(x, out)
 
 
+def test_transformer_created_from_empty_configurations_is_identity():
+    transformer = Transformer.from_configurations([])
+    x = torch.randn((1, 16, 16, 16))
+    out = transformer(x)
+    assert torch.allclose(x, out)
