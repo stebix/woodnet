@@ -19,6 +19,8 @@ from woodnet.datasets.utils import generate_cylindrical_roi
 from woodnet.datasets.summary.summary import scrape_directory
 import woodnet.transformations.buildtools
 
+from woodnet.datasets.planar.tilehelpers import compute_centroid_square, to_slices
+
 LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -138,19 +140,67 @@ class TileSelector:
         self.tileshape = tileshape
 
 
+class BaseSubselector:
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        raise NotImplementedError(
+            f'{self.__class__.__name__} must implement __call__ method.'
+        )
+
+
+class CentroidTileSubselector(BaseSubselector):
+    """
+    Subselect a square in-plane tile from the center of the data.
+    Supports subselection along the z-axis.
+    Input data is expected to be in the layout:
+        ([...pre_dims...] x D x H x W)
+    where D is the depth, H is the height and W is the width
+    and an arbitrary number of pre-dimensions. 
+    """
+    log_action: bool = True
+    def __init__(
+        self,
+        z_spacing: int | None = None,
+    ) -> None:
+        self.z_spacing = z_spacing
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        *pre, D, H, W = data.shape
+        if self.z_spacing is not None:
+            zslice = slice(0, D, self.z_spacing)
+        else:
+            zslice = slice(0, D)
+        yx_slices = to_slices(*compute_centroid_square((H, W)))
+        wildcards = tuple(slice(None) for _ in range(len(pre)))
+        subselection = data[*wildcards, zslice, *yx_slices]
+        if self.log_action:
+            self._log_subselection(data, subselection)
+        return subselection
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(z_spacing={self.z_spacing})'
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def _log_subselection(self, input: np.ndarray, output: np.ndarray) -> None:
+        logger.debug(
+            f'{str(self)} subselection action: {input.shape} -> {output.shape}'
+        )
+
 
 
 def build_from_zarr(
     path: Path,
     internal_path: str,
     phase: Literal['train', 'val', 'test'],
-    scaling_policy: Literal['default', 'clipping', 'manual'] | None = 'default',
-    transformer: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    transformer: Callable[[torch.Tensor], torch.Tensor],
+    subselector: BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
+    scaling_policy: Literal['default', 'clipping'] | None = 'default',
     classlabel_mapping: dict[str, int] | None = None, 
 ) -> TileDataset:
     
     logger.debug(
-        f'Starting build process for TileDataset from \'{path}/{internal_path}\''
+        f'Starting build process for TileDataset from \'{path}{internal_path}\''
     )
     if classlabel_mapping is None and phase != 'test':
         raise ValueError(
@@ -162,11 +212,24 @@ def build_from_zarr(
     fingerprint = Fingerprint.from_zarr_array(zarrobj[internal_path])
     data = zarrobj[internal_path][...]
 
+    if subselector is not None:
+        logger.debug(
+            f'Applying subselector {str(subselector)} to data with shape {data.shape} '
+            f'from source \'{path}{internal_path}\''
+        )
+        data = subselector(data)
+
+    if scaling_policy is not None:
+        scaler_creator = get_scaler_function(scaling_policy)
+        scaler = scaler_creator(path, internal_path)
+        transformer.prepend(scaler)
+
     dataset = TileDataset(
         phase=phase,
         data=data,
         fingerprint=fingerprint,
         stats=stats,
+        transformer=transformer,
         classlabel_mapping=classlabel_mapping,
     )
     return dataset
@@ -269,7 +332,7 @@ def create_clipping_scaler(
     new_stdev = new_parameters['stdev']
     logger.debug(
         f'Created clipping scaler with recomputed parameters: mean = {new_mean} and '
-        f'{new_stdev} using ROI = \'{fingerprint.roi}\' from path \'{path}/{internal_path}\''
+        f'{new_stdev} using ROI = \'{fingerprint.roi}\' from path \'{path}{internal_path}\''
     )
     return Normalize(mean=new_mean, std=new_stdev)
 
@@ -286,7 +349,7 @@ def create_default_scaler(
     stats = StatParams.from_zarr_array(zarrobj[internal_path])
     logger.debug(
         f'Created default scaler with parameters: mean = {stats.mean} and '
-        f'{stats.stdev} from path \'{path}/{internal_path}\''
+        f'stdev = {stats.stdev} from path \'{path}{internal_path}\''
     )
     return Normalize(mean=stats.mean, std=stats.stdev)
 
