@@ -68,7 +68,28 @@ class Transformer:
         self._parametrized_transform = new
 
 
+    def append(self, transform: Callable[[torch.Tensor], torch.Tensor]) -> None:
+        """Append a new transform to the transformation pipeline."""
+        if not callable(transform):
+            raise TypeError(f'Expected callable, but got {type(transform)}!')
+        self.transforms.append(transform)
+        logger.debug(f'Appended new transform: {transform}.')
 
+
+    def insert(self, index: int, transform: Callable[[torch.Tensor], torch.Tensor]) -> None:
+        """Insert a new transform at the given index."""
+        if not callable(transform):
+            raise TypeError(f'Expected callable, but got {type(transform)}!')
+        self.transforms.insert(index, transform)
+        logger.debug(f'Inserted new transform: {transform} at index {index}.')
+
+
+    def prepend(self, transform: Callable[[torch.Tensor], torch.Tensor]) -> None:
+        """Prepend a new transform to the transformation pipeline."""
+        if not callable(transform):
+            raise TypeError(f'Expected callable, but got {type(transform)}!')
+        self.transforms.insert(0, transform)
+        logger.debug(f'Prepended new transform: {transform}.')
 
 
 class ScriptedTransformer:
