@@ -1,9 +1,11 @@
 import logging
 
 from collections.abc import Callable, Sequence
-from typing import Literal
+from enum import Enum
+from typing import Literal, Any
 from pathlib import Path
 from functools import cached_property
+from copy import deepcopy
 
 import attrs
 import zarr
@@ -18,6 +20,7 @@ from woodnet.transformations.transforms import Normalize
 from woodnet.datasets.utils import generate_cylindrical_roi
 from woodnet.datasets.summary.summary import scrape_directory
 import woodnet.transformations.buildtools
+from woodnet.transformations.transformer import Transformer
 
 from woodnet.datasets.planar.tilehelpers import compute_centroid_square, to_slices
 
@@ -48,11 +51,11 @@ class TileDataset(Dataset):
         self.shape = None
         self.channels: int = 0
         self.data: np.ndarray = self._initialize_data(data)
-        self._log_initialization()
         self.transformer = transformer
         self.fingerprint: Fingerprint = fingerprint
         self.stats: StatParams = stats
         self.classlabel_mapping= classlabel_mapping or {}
+        self._log_initialization()
 
 
     def _initialize_data(self, data: np.ndarray) -> np.ndarray:
@@ -123,27 +126,42 @@ class TileDataset(Dataset):
 
     def _log_initialization(self) -> None:
         logger.info(
-            f'{self.__class__.__name__} initialized with phase: {self.phase}, '
-            f'data shape: {self.shape}, channels: {self.channels} and '
-            f'total length: {len(self)}'
+            f'Initialization success for {self.__class__.__name__} with phase=\'{self.phase}\' '
+            f'shape={self.shape} channels={self.channels} and '
+            f'length={len(self)} and class_=\'{self.class_}\' and label={self.label} '
         )
 
-
-class TileSelector:
-
-    def __init__(
-        self,
-        baseshape: tuple[int, int, int],
-        tileshape: tuple[int, int]
-    ):
-        self.baseshape = baseshape
-        self.tileshape = tileshape
+    def reinitialize(self, data: np.ndarray) -> 'TileDataset':
+        """
+        Reinitialize the dataset with new data.
+        Intended usage:
+        Healing dataset shape to enable batch collation after the multiple
+        datasets have been created progrmmatically.
+        We provide a separate method to avoid 'dirty' mutation of the
+        data attribute.
+        """
+        return TileDataset(
+            phase=self.phase,
+            data=data,
+            fingerprint=self.fingerprint,
+            stats=self.stats,
+            transformer=self.transformer,
+            classlabel_mapping=self.classlabel_mapping,
+        )
+        
 
 
 class BaseSubselector:
+    log_action: bool = True
+
     def __call__(self, data: np.ndarray) -> np.ndarray:
         raise NotImplementedError(
             f'{self.__class__.__name__} must implement __call__ method.'
+        )
+
+    def _log_subselection(self, input: np.ndarray, output: np.ndarray) -> None:
+        logger.debug(
+            f'{str(self)} subselection action: {input.shape} -> {output.shape}'
         )
 
 
@@ -156,7 +174,6 @@ class CentroidTileSubselector(BaseSubselector):
     where D is the depth, H is the height and W is the width
     and an arbitrary number of pre-dimensions. 
     """
-    log_action: bool = True
     def __init__(
         self,
         z_spacing: int | None = None,
@@ -182,10 +199,109 @@ class CentroidTileSubselector(BaseSubselector):
     def __str__(self) -> str:
         return repr(self)
 
-    def _log_subselection(self, input: np.ndarray, output: np.ndarray) -> None:
-        logger.debug(
-            f'{str(self)} subselection action: {input.shape} -> {output.shape}'
+
+class ZSpacingStrategy(Enum):
+    TIGHT = 'tight'
+    SPREAD = 'spread'
+
+
+class PhysicalCenterTileSubselector(BaseSubselector):
+    """
+    This subselector selects a centroid cuboid from the input data.
+
+    The in-plane shape is determined based on the desired `target_in_plane_length`
+    that specifies the *physical* size of the in-plane tile.
+    The in-plane shape is computed based on the input voxel size.
+    Along the z-axis, we can select the desired number of slices.
+    The selection along the z-axis has two strategies:
+    - TIGHT: densely select the z-slices around the center of the data
+    - SPREAD: select the z-slices evenly distributed across full z-axis
+    """
+    def __init__(
+        self,
+        target_in_plane_length: float,
+        input_voxel_size: float,
+        target_slice_count: int,
+        z_spacing_strategy: str | ZSpacingStrategy = ZSpacingStrategy.TIGHT,
+    ) -> None:
+        self.target_in_plane_length = target_in_plane_length
+        self.input_voxel_size = input_voxel_size
+        self.target_slice_count = target_slice_count
+        self._in_plane_shape = self._compute_in_plane_shape(
+            target_length=target_in_plane_length,
+            voxel_size=input_voxel_size
         )
+        if not isinstance(z_spacing_strategy, ZSpacingStrategy):
+            z_spacing_strategy = ZSpacingStrategy(z_spacing_strategy)    
+        self.z_spacing_strategy = z_spacing_strategy
+
+    def __str__(self) -> str:
+        return (f'{self.__class__.__name__}(target_in_plane_length={self.target_in_plane_length}, '
+                f'input_voxel_size={self.input_voxel_size}, '
+                f'target_slice_count={self.target_slice_count}, '
+                f'z_spacing_strategy={self.z_spacing_strategy})')
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    @staticmethod
+    def _compute_in_plane_shape(target_length: float, voxel_size: float) -> tuple[int, int]:
+        """
+        Compute the in-plane shape based on the desired target length
+        and the voxel size of the data.
+        """
+        s = int(np.floor(target_length / voxel_size))
+        return (s, s)
+    
+    @staticmethod
+    def _compute_center_slices(H: int, W: int, tileshape: tuple[int, int]) -> tuple[slice, slice]:
+        cy = H // 2
+        cx = W // 2
+        dy, dx = tileshape
+        yslice = slice(cy - dy // 2, cy + dy // 2 + dy % 2)
+        xslice = slice(cx - dx // 2, cx + dx // 2 + dx % 2)
+        return (yslice, xslice)
+
+    @staticmethod
+    def _compute_z_indices(
+        D: int,
+        target_slice_count: int,
+        z_spacing_strategy: ZSpacingStrategy
+    ) -> np.ndarray:
+        cz = D // 2
+        if z_spacing_strategy is ZSpacingStrategy.TIGHT:
+            z_indices = np.arange(
+                cz - target_slice_count // 2,
+                cz + target_slice_count // 2 + target_slice_count % 2
+            )
+        elif z_spacing_strategy is ZSpacingStrategy.SPREAD:
+            z_indices = np.linspace(0, D, num=target_slice_count).astype(int)
+            # protect against out of bounds and multi-selection of a slice
+            z_indices = np.clip(z_indices, 0, D - 1)
+            z_indices = np.unique(z_indices)
+        else:
+            raise ValueError(
+                f'Invalid z_spacing_strategy: {z_spacing_strategy}. '
+                f'Expected one of {ZSpacingStrategy.__members__}'
+            )
+        return z_indices
+            
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        *pre, D, H, W = data.shape
+        if self.target_slice_count > D:
+            raise ValueError(
+                f'requested target slice count {self.target_slice_count} is greater than data z size {D}.'
+            )
+        (yslice, xslice) = self._compute_center_slices(H, W, self._in_plane_shape)
+        z_indices = self._compute_z_indices(
+            D=D, target_slice_count=self.target_slice_count, z_spacing_strategy=self.z_spacing_strategy
+        )
+        wildcards = tuple(slice(None) for _ in range(len(pre)))
+        subselection = data[*wildcards, z_indices, yslice, xslice]
+        if self.log_action:
+            self._log_subselection(data, subselection)
+        return subselection
 
 
 
@@ -219,6 +335,9 @@ def build_from_zarr(
         )
         data = subselector(data)
 
+    # avoid global state via list
+    transformer = deepcopy(transformer)
+
     if scaling_policy is not None:
         scaler_creator = get_scaler_function(scaling_policy)
         scaler = scaler_creator(path, internal_path)
@@ -242,37 +361,158 @@ DEFAULT_CLASSLABEL_MAPPING: dict[str, int] = {
 
 
 def bulk_build_from_zarr(
-    base_directory: Path,
-    IDs: Sequence[str],
+    paths: Sequence[Path],
     internal_path: str,
     phase: Literal['train', 'val', 'test'],
-    scaling_policy: Literal['default', 'clipping'] = 'default',
-    transform_configurations: Sequence[dict] | None = None,
+    transformer: Transformer | Callable[[torch.Tensor], torch.Tensor],
+    subselector: BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
+    scaling_policy: Literal['default', 'clipping'] | None = 'default',
     classlabel_mapping: dict[str, int] =  DEFAULT_CLASSLABEL_MAPPING,
+    leave_pbar: bool = True,
 ) -> list[TileDataset]:
-    transform_configurations = transform_configurations or []
-    available_IDs = scrape_directory(base_directory)
     
-    transformer = woodnet.transformations.buildtools.from_configurations(
-        transform_configurations
-    )
-    
-
     datasets = []
-    for ID in tqdm.tqdm(IDs):
-        try:
-            fpath = available_IDs[ID]
-        except KeyError:
-            logger.warning(
-                f'Dataset with ID {ID} not found in base directory {base_directory}. '
-                f'Skipping this ID for dataset build process.'
-            )
+    wrapped_paths = tqdm.tqdm(paths, desc='Building datasets', leave=leave_pbar)
+    for path in wrapped_paths:
+        wrapped_paths.set_postfix_str(f'Current: \'{path.stem}\'')
+        dataset = build_from_zarr(
+            path=path,
+            internal_path=internal_path,
+            phase=phase,
+            subselector=subselector,
+            transformer=transformer,
+            scaling_policy=scaling_policy,
+            classlabel_mapping=classlabel_mapping
+        )
+        datasets.append(dataset)
+
+    return datasets
+
+
+
+def heal_datasets(
+    datasets: Sequence[TileDataset],
+    pad_mode: str = 'edge',
+    tolerance: int = 5,
+    constant_value: float = 0.0,
+    **kwargs: Any,
+) -> list[TileDataset]:
+    """
+    Heal the datasets to have the same shape by padding them to the maximum shape.
+    Healing is only applied to the in-plane dimensions, i.e. ([...] x H x W).
+    The tolerance is the maximum allowed difference in the in-plane dimensions,
+    otherwse a `ValueError` is raised.
+
+    Parameters
+    ----------
+
+    datasets : Sequence[TileDataset]
+        The datasets to be healed.
+    
+    pad_mode : str
+        The padding mode to be used. Default is 'reflect'.
+        Possible values are:
+
+        'constant' 
+            Pads with a constant value.
+        'edge'
+            Pads with the edge values of array.
+        'linear_ramp'
+            Pads with the linear ramp between end_value and the
+            array edge value.
+        'maximum'
+            Pads with the maximum value of all or part of the
+            vector along each axis.
+        'mean'
+            Pads with the mean value of all or part of the
+            vector along each axis.
+        'median'
+            Pads with the median value of all or part of the
+            vector along each axis.
+        'minimum'
+            Pads with the minimum value of all or part of the
+            vector along each axis.
+        'reflect'
+            Pads with the reflection of the vector mirrored on
+            the first and last values of the vector along each
+            axis.
+        'symmetric'
+            Pads with the reflection of the vector mirrored
+            along the edge of the array.
+        'wrap'
+            Pads with the wrap of the vector along the axis.
+            The first values are used to pad the end and the
+            end values are used to pad the beginning.
+    
+    constant_value : float, optional
+        The constant value to be used for padding if `pad_mode` is 'constant'.
+        Default is 0.
+
+    **kwargs : Any
+        Additional keyword arguments for the padding function.
+        See `np.pad` for more details.
+    """
+    shapes = np.array([dataset.shape for dataset in datasets])
+    shapeset = {dataset.shape for dataset in datasets}
+    if len(shapeset) == 1:
+        logger.info(
+            f'Healing not necessary - homogenous datasets shape: {shapeset.pop()}'
+        )
+        return datasets
+    max_sizes = np.max(shapes, axis=0)
+    min_sizes = np.min(shapes, axis=0)
+    *pre_diff, z_diff, y_diff, x_diff = max_sizes - min_sizes
+    logger.info(
+        f'Got N={len(datasets)} datasets with shapeset {shapeset} and '
+        f'max_x_shape_diff={x_diff} and max_y_shape_diff={y_diff}'
+    )
+    diffs  = np.array((y_diff, x_diff))
+    if np.any(diffs > tolerance):
+        raise ValueError(
+            f'Dataset shapes differ by more than {tolerance} voxels: {diffs}'
+        )
+
+    *_, y_target_sz, x_target_sz = max_sizes
+
+    healed_datasets: list[TileDataset] = []
+
+    for dataset in datasets:
+        rawdata = dataset.data
+        assert isinstance(rawdata, np.ndarray), f'expected np.ndarray, but got {type(rawdata)}'
+        *pre, z_sz, y_sz, x_sz = rawdata.shape
+        if y_sz == y_target_sz and x_sz == x_target_sz:
+            healed_datasets.append(dataset)
             continue
 
+        # pad rawdata to target shape
+        y_pre = (y_target_sz - y_sz) // 2
+        y_post = (y_target_sz - y_sz) // 2 + (y_target_sz - y_sz) % 2
+        x_pre = (x_target_sz - x_sz) // 2
+        x_post = (x_target_sz - x_sz) // 2 + (x_target_sz - x_sz) % 2
+        # no padding for pre-dimensions and for z-dimension
+        padspec = tuple(
+            [
+            *((0, 0) for _ in range(len(pre))),
+             (0, 0), (y_pre, y_post), (x_pre, x_post)
+            ]
+        )
+        if pad_mode == 'constant':
+            # np.pad allows `constant_values` only for constant mode
+            kwargs['constant_values'] = constant_value
+        healed_rawdata = np.pad(
+            rawdata,
+            pad_width=padspec,
+            mode=pad_mode,
+            **kwargs
+        )
+        logger.debug(
+            f'healed dataset shape {rawdata.shape} -> {healed_rawdata.shape} '
+            f'with padspec {padspec} and pad_mode={pad_mode}'
+        )
+        healed_dataset = dataset.reinitialize(healed_rawdata)
+        healed_datasets.append(healed_dataset)
 
-
-
-
+    return healed_datasets
 
 
 
@@ -370,3 +610,39 @@ def get_scaler_function(
             f'Invalid scaling policy: {scaling_policy}. '
             f'Expected one of [\'default\', \'clipping\']'
         )
+
+
+def multiset_helper(
+    fpaths: Sequence[Path],
+    internal_paths: Sequence[str],
+    phase: Literal['train', 'val', 'test'],
+    transformer: Transformer | Callable[[torch.Tensor], torch.Tensor],
+    subselector: BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
+    scaling_policy: Literal['default', 'clipping'] | None = 'default',
+    classlabel_mapping: dict[str, int] =  DEFAULT_CLASSLABEL_MAPPING,
+    leave_pbar: bool = True,
+) -> dict[str, list[TileDataset]]:
+    """
+    Helper function to create multiple groups datasets from 
+    multiple internal paths at the Zarr stores. 
+    """
+    multiset: dict[str, list[TileDataset]] = {}
+    wrapped_internal_paths = tqdm.tqdm(
+        internal_paths,
+        desc='Group progress',
+        leave=leave_pbar,
+        unit='group'
+    )
+    for internal_path in wrapped_internal_paths:
+        wrapped_internal_paths.set_postfix_str(f'Current: \'{internal_path}\'')
+        datasets = bulk_build_from_zarr(
+            paths=fpaths,
+            internal_path=internal_path,
+            phase=phase,
+            transformer=transformer,
+            subselector=subselector,
+            scaling_policy=scaling_policy,
+            classlabel_mapping=classlabel_mapping
+        )
+        multiset[internal_path] = datasets
+    return multiset
