@@ -21,6 +21,8 @@ from woodnet.logtools.tensorboard.modelparameters.loggers import create_paramete
 from woodnet.checkpoint.registry import create_score_registry
 from woodnet.gradtools.clipping import create_gradclip_func
 
+from woodnet.trainer.multiloader import MultiLoader
+
 from woodnet.evaluation.metrics import compute_ACC, compute_TNR, compute_TPR
 
 LOGGER_NAME: str = '.'.join(('main', __name__))
@@ -54,7 +56,6 @@ def get_expanded_phase(phase: str) -> Literal['train', 'val', 'test']:
         return phase
     
 
-
 class Trainer:
     """
     Specialized multi-DataLoader aware trainer for heterogeneous data sets.
@@ -66,7 +67,7 @@ class Trainer:
                  model: torch.nn.Module,
                  optimizer: torch.optim.Optimizer,
                  criterion: torch.nn.Module,
-                 loaders: dict[str, Sequence[DataLoader]],
+                 loaders: dict[str, DataLoader | MultiLoader],
                  handler: ExperimentDirectoryHandler,
                  validation_criterion: torch.nn.Module,
                  validation_metric: str,
@@ -96,9 +97,9 @@ class Trainer:
         else:
             self.device = device
         
-        self.train_loaders = loaders.get('train')
-        self.val_loaders = loaders.get('val')
-        self.test_loaders = loaders.get('test')
+        self.train_loader = loaders.get('train')
+        self.val_loader = loaders.get('val')
+        self.test_loader = loaders.get('test')
 
         self.validation_criterion = validation_criterion
         self.handler = handler
@@ -141,13 +142,14 @@ class Trainer:
         self.name = name
 
     def train(self) -> None:
-        loader = self.train_loader
+        loader: DataLoader | MultiLoader = self.train_loader
         self.total_progress = tqdm.tqdm(
             total=self.max_num_iters, unit='it', desc='total iterations',
             leave=self.leave_total_progress, postfix=dict(epoch=self.epoch)
         )
         self.logger.info('Starting epoch training loop')
         for _ in range(self.max_num_epochs):
+            self.logger.debug(f'Entering epoch {self.epoch}')
             terminated, reason = self.train_single_epoch(loader)
 
             if terminated:
@@ -195,7 +197,7 @@ class Trainer:
         return (prediction, loss)
     
 
-    def train_single_epoch(self, loader: DataLoader) -> tuple[bool, TerminationReason | None]:
+    def train_single_epoch(self, loader: DataLoader | MultiLoader) -> tuple[bool, TerminationReason | None]:
         """
         Train the model for a single epoch, i.e. iterate over full training data set once.
 
@@ -213,21 +215,24 @@ class Trainer:
             and the reason for termination if applicable.
         """
         self.model.train()
+        self.logger.debug('Sucessfully set model to training mode') #TODO: Remove in prod
         criterion = self.criterion
         device = self.device
         optimizer = self.optimizer
         dtype = self.dtype
         wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='loader progress', leave=False)
-        self.logger.debug(f'Starting epoch {self.epoch}')
+        self.logger.debug(f'Starting epoch {self.epoch} with loader {loader}')
         for batch_idx, batch_data in enumerate(wrapped_loader):
             # data moving
             data, label = batch_data
             data = data.to(device=device, dtype=dtype, non_blocking=True)
             label = label.to(device=device, dtype=dtype, non_blocking=True)
+            logger.debug(f'host device transfer scheduled for batch {batch_idx}')  #TODO: Remove in prod
 
             # actual deep learning
             optimizer.zero_grad()
             prediction, loss = self.forward_pass(data, label, criterion)
+            logger.debug(f'forward pass scheduled for batch {batch_idx} with shape {data.shape}')  #TODO: Remove in prod
 
             self.gradscaler.scale(loss).backward()
 
@@ -237,6 +242,8 @@ class Trainer:
 
             self.gradscaler.step(optimizer)
             self.gradscaler.update()
+
+            logger.debug('grad scaling logic passed') #TODO: Remove in prod
 
             self.running_train_loss.update(loss.item(), get_batchsize(data))
 
@@ -374,14 +381,14 @@ class Trainer:
         return self.validation_iteration % self.test_every_n_validation_iters == 0
 
 
-    def test(self, loader: DataLoader) -> None:
+    def test(self, loader: DataLoader | MultiLoader) -> None:
         device = self.device
         dtype = self.dtype
         criterion = self.validation_criterion
         wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='testing', leave=False)
         running_test_loss = TrackedScalar()
         running_test_metrics = TrackedCardinalities()
-        self.logger.debug('Entering testing loop')
+        self.logger.debug(f'Entering testing loop with loader {loader}')
 
         with self.disabled_gradient_context():
             for batch_idx, batch_data in enumerate(wrapped_loader):
@@ -442,7 +449,7 @@ class Trainer:
         return torch.no_grad()
 
 
-    def validate(self, loader: DataLoader) -> None:
+    def validate(self, loader: DataLoader | MultiLoader) -> None:
         """
         Evaluate performance of current model state via
         prediction of full validation data set.
@@ -460,7 +467,7 @@ class Trainer:
         wrapped_loader = tqdm.tqdm(loader, unit='bt', desc='validation', leave=False)
         running_validation_loss = TrackedScalar()
         running_validation_metrics = TrackedCardinalities()
-        self.logger.debug('Entering validation loop')
+        self.logger.debug(f'Entering validation loop with loader {loader}')
 
         with self.disabled_gradient_context():
             for batch_idx, batch_data in enumerate(wrapped_loader):
@@ -539,7 +546,7 @@ class Trainer:
                device: torch.device,
                optimizer: torch.optim.Optimizer,
                criterion: torch.nn.Module | Callable,
-               loaders: MutableMapping[str, DataLoader],
+               loaders: MutableMapping[str, DataLoader | MultiLoader],
                validation_criterion: Callable | None = None,
                leave_total_progress: bool = True
                ) -> 'Trainer':
