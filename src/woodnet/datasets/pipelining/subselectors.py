@@ -6,8 +6,9 @@ import numpy as np
 
 from woodnet.datasets.pipelining.base import BaseSubselector
 from woodnet.datasets.planar.slicebased import compute_centroid_square, to_slices
+from woodnet.datasets.pipelining.arrayseqmap import map_func_to_arrays, ArraySequence
 
-DEFAULT_LOGGER_NAME: str = '.'.join('main', __name__)
+DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
 logger: logging.Logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
 
@@ -64,7 +65,10 @@ class PhysicalCenterCubeSubselector(BaseSubselector):
         xslice = slice(cx - dx // 2, cx + dx // 2 + dx % 2)
         return (zslice, yslice, xslice)
     
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: ArraySequence | np.ndarray) -> ArraySequence | np.ndarray:
+        return map_func_to_arrays(data, self.apply_to)
+    
+    def apply_to(self, data: np.ndarray) -> np.ndarray:
         *pre, D, H, W = data.shape
         (zslice, yslice, xslice) = self._compute_center_slices(D, H, W, self._cube_shape)
         wildcards = tuple(slice(None) for _ in range(len(pre)))
@@ -156,8 +160,10 @@ class PhysicalCenterTileSubselector(BaseSubselector):
             )
         return z_indices
             
-
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: ArraySequence | np.ndarray) -> ArraySequence | np.ndarray:
+        return map_func_to_arrays(data, self.apply_to)
+        
+    def apply_to(self, data: np.ndarray) -> np.ndarray:
         *pre, D, H, W = data.shape
         if self.target_slice_count > D:
             raise ValueError(
@@ -193,7 +199,10 @@ class CentroidCubeSubselector(BaseSubselector):
     ) -> None:
         self.z_spacing = z_spacing
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: ArraySequence | np.ndarray) -> ArraySequence | np.ndarray:
+        return map_func_to_arrays(data, self.apply_to)
+        
+    def apply_to(self, data: np.ndarray) -> np.ndarray:
         *pre, D, H, W = data.shape
         if self.z_spacing is not None:
             zslice = slice(0, D, self.z_spacing)
