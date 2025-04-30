@@ -1,6 +1,6 @@
 import logging
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Sequence, Mapping
 from enum import Enum
 from typing import Literal, Any
 from pathlib import Path
@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import tqdm.auto as tqdm
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 
 from woodnet.datasets.fingerprints import Fingerprint, StatParams
 from woodnet.transformations.transforms import Normalize
@@ -200,6 +200,47 @@ class CentroidTileSubselector(BaseSubselector):
         return repr(self)
 
 
+class CentroidCubeSubselector(BaseSubselector):
+    """
+    Subselect a square in-plane tile from the center of the data
+    that is assumed to be inside a enclosing circle.
+
+    Here the 
+
+    Input data is expected to be in the layout:
+        ([...pre_dims...] x D x H x W)
+    where D is the depth, H is the height and W is the width
+    and an arbitrary number of pre-dimensions. 
+    """
+    def __init__(
+        self,
+        z_spacing: int | None = None,
+    ) -> None:
+        self.z_spacing = z_spacing
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        *pre, D, H, W = data.shape
+        if self.z_spacing is not None:
+            zslice = slice(0, D, self.z_spacing)
+        else:
+            zslice = slice(0, D)
+        yx_slices = to_slices(*compute_centroid_square((H, W)))
+        wildcards = tuple(slice(None) for _ in range(len(pre)))
+        subselection = data[*wildcards, zslice, *yx_slices]
+        if self.log_action:
+            self._log_subselection(data, subselection)
+        return subselection
+    
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(z_spacing={self.z_spacing})'
+
+    def __str__(self) -> str:
+        return repr(self)
+
+
+
+
+
 class ZSpacingStrategy(Enum):
     TIGHT = 'tight'
     SPREAD = 'spread'
@@ -302,6 +343,134 @@ class PhysicalCenterTileSubselector(BaseSubselector):
         if self.log_action:
             self._log_subselection(data, subselection)
         return subselection
+
+
+
+class PhysicalCenterCubeSubselector(BaseSubselector):
+    """
+    This subselector selects a centroid cube from the input data.
+    The cube edge lengths are fully determined based on the desired
+    `target_in_plane_length` that specifies the *physical* size of the in-plane tile.
+    """
+    def __init__(
+        self,
+        target_in_plane_length: float,
+        input_voxel_size: float,
+    ) -> None:
+        self.target_in_plane_length = target_in_plane_length
+        self.input_voxel_size = input_voxel_size
+        self._cube_shape = self._compute_cube_shape(
+            target_length=target_in_plane_length,
+            voxel_size=input_voxel_size
+        )
+
+    def __str__(self) -> str:
+        return (f'{self.__class__.__name__}(target_in_plane_length={self.target_in_plane_length}, '
+                f'input_voxel_size={self.input_voxel_size})')
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    @staticmethod
+    def _compute_cube_shape(target_length: float, voxel_size: float) -> tuple[int, int, int]:
+        """
+        Compute the cube shape based on the desired target length
+        and the voxel size of the data.
+        """
+        s = int(np.floor(target_length / voxel_size))
+        return (s, s, s)
+    
+    @staticmethod
+    def _compute_center_slices(
+        D: int, H: int, W: int,
+        cubeshape: tuple[int, int, int]
+    ) -> tuple[slice, slice, slice]:
+        cz = D // 2
+        cy = H // 2
+        cx = W // 2
+        dz, dy, dx = cubeshape
+        zslice = slice(cz - dz // 2, cz + dz // 2 + dz % 2)
+        yslice = slice(cy - dy // 2, cy + dy // 2 + dy % 2)
+        xslice = slice(cx - dx // 2, cx + dx // 2 + dx % 2)
+        return (zslice, yslice, xslice)
+    
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        *pre, D, H, W = data.shape
+        (zslice, yslice, xslice) = self._compute_center_slices(D, H, W, self._cube_shape)
+        wildcards = tuple(slice(None) for _ in range(len(pre)))
+        subselection = data[*wildcards, zslice, yslice, xslice]
+        if self.log_action:
+            self._log_subselection(data, subselection)
+        return subselection
+
+
+class ChannelSqueezingProcessor(BaseSubselector):
+    """
+    Subselector that squeezes the channel dimension of the data.
+    """
+    def __self__(
+        self,
+        multichannel_strategy: Literal['raise', 'warn', 'select'] = 'raise',
+        channel_selection: int | None = None, 
+    ) -> None:
+        self.multichannel_strategy = multichannel_strategy
+        self.channel_selection = channel_selection
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        *pre, C, D, H, W = data.shape
+        pre = tuple(slice(None) for _ in range(len(pre)))
+        if C == 1:
+            processed = data[*pre, 0, :, :, :]
+            if self.log_action:
+                self._log_processing(data, processed, cidx=0)
+            return processed
+        if C > 1:
+            if self.multichannel_strategy == 'raise':
+                raise ValueError(
+                    f'Input data has {C} channels, but only one channel is expected. '
+                    f'Use multichannel_strategy=\'select\' to select a channel.'
+                )
+            elif self.multichannel_strategy == 'warn':
+                logger.warning(
+                    f'Input data has {C} channels, but only one channel is expected. '
+                    f'Using channel index 0'
+                )
+                c_idx = 0
+            elif self.multichannel_strategy == 'select':
+                if self.channel_selection is None:
+                    raise ValueError(
+                        'channel_selection must be provided when multichannel_strategy=\'select\''
+                    )
+                c_idx = self.channel_selection
+            
+            processed = data[*pre, c_idx, :, :, :]
+            if self.log_action:
+                self._log_processing(data, processed, cidx=c_idx)
+            return processed
+
+
+    def _log_processing(self, input: np.ndarray, output: np.ndarray, cidx: int) -> None:
+        logger.debug(
+            f'{str(self)} channel processing action: {input.shape} -> {output.shape} '
+            f'with channel index {cidx}'
+        )
+
+
+class Pipeline:
+
+    def __init__(
+        self,
+        *steps: BaseSubselector,
+    ) -> None:
+        self.steps = steps
+
+    def __call__(self, data: np.ndarray) -> np.ndarray:
+        """
+        Apply the pipeline to the data.
+        """
+        for step in self.steps:
+            data = step(data)
+        return data
 
 
 
@@ -612,7 +781,7 @@ def get_scaler_function(
         )
 
 
-def multiset_helper(
+def bulk_group_build_from_zarr(
     fpaths: Sequence[Path],
     internal_paths: Sequence[str],
     phase: Literal['train', 'val', 'test'],
@@ -620,13 +789,15 @@ def multiset_helper(
     subselector: BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
     scaling_policy: Literal['default', 'clipping'] | None = 'default',
     classlabel_mapping: dict[str, int] =  DEFAULT_CLASSLABEL_MAPPING,
+    heal_in_group: bool = True,
+    heal_kwargs: dict[str, Any] | None = None,
     leave_pbar: bool = True,
-) -> dict[str, list[TileDataset]]:
+) -> dict[str, dict[str, TileDataset]]:
     """
     Helper function to create multiple groups datasets from 
     multiple internal paths at the Zarr stores. 
     """
-    multiset: dict[str, list[TileDataset]] = {}
+    multisets: dict[str, dict[str, TileDataset]] = {}
     wrapped_internal_paths = tqdm.tqdm(
         internal_paths,
         desc='Group progress',
@@ -644,5 +815,65 @@ def multiset_helper(
             scaling_policy=scaling_policy,
             classlabel_mapping=classlabel_mapping
         )
-        multiset[internal_path] = datasets
-    return multiset
+        if heal_in_group:
+            heal_kwargs = heal_kwargs or {}
+            datasets = heal_datasets(
+                datasets=datasets,
+                **heal_kwargs
+            )
+        datasets = {
+            dataset.fingerprint.ID : dataset
+            for dataset in datasets
+        }
+        multisets[internal_path] = datasets
+    return multisets
+
+
+
+def multisets_to_loaders(
+    multisets: dict[str, dict[str, TileDataset]],
+    batch_size: int | Mapping[str, int],
+    shuffle: bool = True,
+    num_workers: int = 0,
+    pin_memory: bool = True,
+    drop_last: bool = False,
+    persistent_workers: bool = True,
+    **kwargs: Any,
+) -> dict[str, DataLoader]:
+    """
+    Create DataLoaders for each group of datasets in the multisets.
+    Gist:
+    - a group is a dictionary of datasets with the dataset ID as key
+        i.e. a value of the top level `multisets` dictionary
+    - a group will be merged into a single ConcatDataset
+    - a DataLoader will be created from each ConcatDataset
+    - the DataLoader will be returned in a dictionary with the group name as key
+        i.e. the key of the top level `multisets` dictionary
+    - the batch size can be a single integer or a dictionary with
+      the group name as key to set the batch size group specific
+        
+    Parameters
+    ----------
+    multisets : dict[str, dict[str, TileDataset]]
+        The multisets/groups of datasets to create DataLoaders for.
+        Every group is a dictionary of datasets with the dataset ID as key.
+        A group willt be merged into a single ConcatDataset.
+    """
+    loaders = {}
+    if isinstance(batch_size, int):
+        batch_size = {k : batch_size for k in multisets.keys()}
+    batch_size = batch_size if isinstance(batch_size, Mapping) else {k: batch_size for k in multisets.keys()}
+    for group, datasets in multisets.items():
+        dataset = ConcatDataset(datasets=datasets.values())
+        loader = DataLoader(
+            dataset=dataset,
+            batch_size=batch_size[group],
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            drop_last=drop_last,
+            persistent_workers=persistent_workers,
+            **kwargs
+        )
+        loaders[group] = loader
+    return loaders
