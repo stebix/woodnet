@@ -2,6 +2,8 @@ import logging
 
 import numpy as np
 
+from woodnet.datasets.pipelining.arrayseqmap import ArraySequence
+
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
 
@@ -27,7 +29,7 @@ class BaseSubselector(PipelineStep):
     """
     log_action: bool = True
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: np.ndarray | ArraySequence) -> np.ndarray | ArraySequence:
         raise NotImplementedError(
             f'{self.__class__.__name__} must implement __call__ method.'
         )
@@ -41,7 +43,7 @@ class BaseSubselector(PipelineStep):
 class BaseProcessor(PipelineStep):
     log_action: bool = True
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
+    def __call__(self, data: np.ndarray | ArraySequence) -> np.ndarray | ArraySequence:
         raise NotImplementedError(
             f'{self.__class__.__name__} must implement __call__ method.'
         )
