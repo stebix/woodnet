@@ -69,3 +69,10 @@ class ChannelSqueezingProcessor(BaseProcessor):
             f'{str(self)} channel processing action: {input.shape} -> {output.shape} '
             f'with channel index {cidx}'
         )
+
+    def __repr__(self) -> str:
+        return (f'{self.__class__.__name__}(multichannel_strategy=\'{self.multichannel_strategy}\', '
+                f'channel_selection={self.channel_selection})')
+
+    def __str__(self) -> str:
+        return repr(self)
