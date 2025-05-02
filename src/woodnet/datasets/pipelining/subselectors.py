@@ -21,7 +21,16 @@ class PhysicalCenterCubeSubselector(BaseSubselector):
     """
     This subselector selects a centroid cube from the input data.
     The cube edge lengths are fully determined based on the desired
-    `target_in_plane_length` that specifies the *physical* size of the in-plane tile.
+    `target_in_plane_length` that specifies the *physical*
+    size of the in-plane tile.
+    In the top down view, the selection looks like this:
+        *********
+        *       *
+        *  :::  *       Here * denotes the host volume boundaries
+        *  : :  *       and : denotes the selected cube
+        *  :::  *
+        *       *
+        *********
     """
     def __init__(
         self,
@@ -185,9 +194,22 @@ class CentroidCubeSubselector(BaseSubselector):
     """
     Subselect a square in-plane tile from the center of the data
     that is assumed to be inside a enclosing circle.
+    E.g. from top down view, we select the square that is inscribed
+    in the circle that is the salient foreground ROI.
 
-    Here the 
+         *******                        
+      ***       ***                     
+     *   .......   *                    
+    *    :     :    *                   
+    *    :     :    *    <- Inner cube is selected             
+    *    :     :    *                   
+     *   '''''''   *                    
+      ***       ***                     
+         *******       
 
+    The subselector may yield multiple centroid cubes as a result
+    when the in plane edge length `(s, s)` fits multiple times
+    along the depth axis, i.e. `D // s > 1`.
     Input data is expected to be in the layout:
         ([...pre_dims...] x D x H x W)
     where D is the depth, H is the height and W is the width
@@ -195,28 +217,73 @@ class CentroidCubeSubselector(BaseSubselector):
     """
     def __init__(
         self,
-        z_spacing: int | None = None,
+        cube_limit: int | None = None,
     ) -> None:
-        self.z_spacing = z_spacing
+        self.cube_limit = cube_limit
 
     def __call__(self, data: ArraySequence | np.ndarray) -> ArraySequence | np.ndarray:
         return map_func_to_arrays(data, self.apply_to)
         
-    def apply_to(self, data: np.ndarray) -> np.ndarray:
+    def apply_to(self, data: np.ndarray) -> np.ndarray | list[np.ndarray]:
         *pre, D, H, W = data.shape
-        if self.z_spacing is not None:
-            zslice = slice(0, D, self.z_spacing)
-        else:
-            zslice = slice(0, D)
-        yx_slices = to_slices(*compute_centroid_square((H, W)))
+        (sy, sx, s, s) = compute_centroid_square((H, W))
+        yx_slices = to_slices(sy, sx, s ,s)
+        zslices = self._compute_z_slices(
+            D=D,
+            size=s,
+            max_cubes=self.cube_limit
+        )
         wildcards = tuple(slice(None) for _ in range(len(pre)))
-        subselection = data[*wildcards, zslice, *yx_slices]
+        subselection = []
+        for zslice in zslices:
+            subselection.append(data[*wildcards, zslice, *yx_slices])
+
+        # squeeze the output if only one cube is selected
+        if len(subselection) == 1:
+            subselection = subselection[0]
+
         if self.log_action:
             self._emit_action_log(data, subselection)
+            
         return subselection
     
+    @staticmethod
+    def _compute_z_slices(D: int, size: int, max_cubes: int | None) -> list[slice]:
+        """
+        Compute the z-slices for the centroid cubes of edge length `size`.
+        The z slices are computed such that the cubes are distanced
+        evenly along the z-axis.
+        The number of cubes is limited to `max_cubes`.
+        """
+        count = min(D // size, max_cubes) if max_cubes is not None else D // size
+        remainder = D - (count * size)
+        if count == 0:
+            raise ValueError(
+                f'cannot fit cube of size {size} into data of depth {D}.'
+            )
+        zslices = []
+        for i in range(count):
+            start = i * size + (remainder // count) * i
+            end = start + size
+            zslices.append(slice(start, end))
+        return zslices
+
+    
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(z_spacing={self.z_spacing})'
+        return f'{self.__class__.__name__}(cube_limit={self.cube_limit})'
 
     def __str__(self) -> str:
         return repr(self)
+
+    def _emit_action_log(
+        self,
+        input: np.ndarray,
+        output: np.ndarray | list[np.ndarray]
+    ) -> None:
+        if isinstance(output, list):
+            msg_part = f'N={len(output)} items with shape {output[0].shape}'
+        else:
+            msg_part = f' {output.shape}'
+        logger.debug(
+            f'{str(self)} subselection action: {input.shape} -> {msg_part}'
+        )
