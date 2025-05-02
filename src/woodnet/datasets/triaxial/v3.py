@@ -1,7 +1,7 @@
 import logging
 
 from collections.abc import Callable, Sequence
-from typing import TypeAlias, Literal
+from typing import TypeAlias, Literal, Union
 from itertools import product
 from functools import cached_property
 from pathlib import Path
@@ -16,11 +16,19 @@ from woodnet.datasets.fingerprints import Fingerprint, StatParams
 from woodnet.datasets.triaxial.typespecs import Planespec3D
 import woodnet.datasets.planar.slicebased as slb
 
+from woodnet.datasets.pipelining.base import PipelineStep
+from woodnet.datasets.pipelining.pipeline import Pipeline
+
+from woodnet.datasets.pipelining.arrayseqmap import ArraySequence
 
 Dataset: TypeAlias = torch.utils.data.Dataset
 
 DEFAULT_LOGGER_NAME: str = '.'.join(('main', __name__))
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
+
+def delta(s: slice) -> int:
+    return s.stop - s.start
+
 
 def generate_plane_indices(
     shape: Sequence[int],
@@ -100,7 +108,7 @@ def row_outer_product(arrays: Sequence[np.ndarray]) -> np.ndarray:
             f'axis sizes: {trailing_axis_sizes}'
         )
     
-    dtype = np.uint16
+    dtype = np.int32
     num_arrays = len(arrays)
     # Calculate the number of combinations
     num_combinations = np.prod([shape[0] for shape in shapes])
@@ -162,7 +170,7 @@ class V3TriaxialDataset(Dataset):
         self,
         phase: Literal['train', 'val', 'test'],
         data: np.ndarray,
-        planestride: tuple[int, int, int],
+        planestride: int | tuple[int, int, int],
         fingerprint: Fingerprint,
         stats: StatParams,
         transformer: Callable[[torch.Tensor], torch.Tensor] = None,
@@ -175,7 +183,7 @@ class V3TriaxialDataset(Dataset):
         self.shape = None
         self.channels: int = 0
         self.data: np.ndarray = self._initialize_data(data)
-        self.planestride = planestride
+        self.planestride = self._intialize_planestride(planestride)
         self.transformer = transformer
         self.fingerprint: Fingerprint = fingerprint
         self.stats: StatParams = stats
@@ -197,13 +205,25 @@ class V3TriaxialDataset(Dataset):
         self.shape = data.shape
         return data
 
+    @staticmethod
+    def _intialize_planestride(planestride: int | tuple[int, int, int]) -> tuple[int, int, int]:
+        """
+        Initialize the planestride parameter.
+        """
+        if isinstance(planestride, int):
+            return (planestride,) * 3
+        elif len(planestride) == 3:
+            return tuple(planestride)
+        else:
+            raise ValueError(
+                f'{V3TriaxialDataset.__name__} planestride must be an integer or a tuple of 3 integers'
+            )
+
 
     def _build_triax_planes_specs(self) -> np.ndarray:
         """
         Build the numpy index array spcifying the triaxial planes.
         """
-        print(self.shape)
-        print(self.planestride)
         # this gives us the planes separate for every axis
         axiswise_parameters = [
             generate_plane_indices(self.shape, axis, stride)
@@ -264,21 +284,67 @@ class V3TriaxialDataset(Dataset):
     def label(self) -> int:
         return self.classlabel_mapping[self.fingerprint.class_]
 
+    @cached_property
+    def element_shape(self) -> tuple[int, int, int]:
+        """
+        Get the shape of a single element in the dataset.
+        """
+        # we have 3 planes, each with the same shape
+        # thus we can just take the first one
+        plane_parameters = self.triaxial_plane_parameters[0]
+        planespec = np.apply_along_axis(
+            convert_to_slices_from,
+            axis=1,
+            arr=plane_parameters
+        )
+        zplane, yplane, xplane = tuple(tuple(p) for p in planespec)
+        # this also some soft sanity checking that we allow here since runtime cost
+        # has to be paid only once for the cached attribute
+        _, z_hslice, z_wslice = zplane
+        y_hslice, _, y_wslice = yplane
+        x_hslice, x_wslice, _ = xplane
+        assert delta(z_hslice) == delta(y_hslice) == delta(x_hslice), (f'expecting same height for all planes but '
+                                                                       f'got {delta(z_hslice)} {delta(y_hslice)} {delta(x_hslice)}')
+        assert delta(z_wslice) == delta(y_wslice) == delta(x_wslice), 'expecting same width for all planes'
+        return (3, delta(z_hslice), delta(z_wslice))
 
+    def reinitialize(self, data: np.ndarray) -> 'V3TriaxialDataset':
+        """
+        Reinitialize the dataset with new data.
+        Intended usage:
+        Healing dataset shape to enable batch collation after the multiple
+        datasets have been created progrmmatically.
+        We provide a separate method to avoid 'dirty' mutation of the
+        data attribute.
+        """
+        logger.debug(
+            f'reinitializing {self.__class__.__name__} dataset - old data '
+            f'shape {self.data.shape} -> new data shape {data.shape}'
+        )
+        return V3TriaxialDataset(
+            phase=self.phase,
+            data=data,
+            planestride=self.planestride,
+            fingerprint=self.fingerprint,
+            stats=self.stats,
+            transformer=self.transformer,
+            classlabel_mapping=self.classlabel_mapping,
+        )
+    
     @classmethod
     def build_from_zarr(
         cls,
         path: str | Path,
         internal_path: str,
         phase: Literal['train', 'val', 'test'],
-        planestride: tuple[int, int, int],
+        planestride: int | tuple[int, int, int],
         transformer: Callable[[torch.Tensor], torch.Tensor],
-        subselector: slb.BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
+        pipeline: Pipeline | PipelineStep | Callable[[np.ndarray], np.ndarray] | None = None,
         scaling_policy: Literal['default', 'clipping'] | None = 'default',
         classlabel_mapping: dict[str, int] | None = None, 
-    ) -> 'V3TriaxialDataset':
+    ) -> Union['V3TriaxialDataset', list['V3TriaxialDataset']]:
         """
-        Build a dataset from a zarr file.
+        Build single or many dataset from a zarr file.
         """
         logger.debug(
             f'Starting build process for {cls.__name__} from \'{path}{internal_path}\''
@@ -293,14 +359,22 @@ class V3TriaxialDataset(Dataset):
         fingerprint = Fingerprint.from_zarr_array(zarrobj[internal_path])
         data = zarrobj[internal_path][...]
 
-        if subselector is not None:
+        if pipeline is not None:
             logger.debug(
-                f'Applying subselector {str(subselector)} to data with shape {data.shape} '
+                f'Passing data with shape {data.shape} to pipeline {pipeline} '
                 f'from source \'{path}{internal_path}\''
             )
-            data = subselector(data)
+            # data can now be an ArraySequence if we extract multiple subchunks
+            data: ArraySequence | np.ndarray = pipeline(data)
 
-        # avoid global state via list
+            # TODO: fix this - we only support lists and tuples
+            if not (isinstance(data, np.ndarray) or isinstance(data, (list, tuple))):
+                raise NotImplementedError(
+                    f'Pipeline {pipeline} (possibly) returned data of type {type(data)}, '
+                    f'but only lists and tuples are supported for now! sorry!'
+                )
+
+        # avoid global state: transformer has internal mutable list
         transformer = deepcopy(transformer)
 
         if scaling_policy is not None:
@@ -308,16 +382,34 @@ class V3TriaxialDataset(Dataset):
             scaler = scaler_creator(path, internal_path)
             transformer.prepend(scaler)
 
-        dataset = cls(
-            phase=phase,
-            data=data,
-            planestride=planestride,
-            fingerprint=fingerprint,
-            stats=stats,
-            transformer=transformer,
-            classlabel_mapping=classlabel_mapping,
-        )
-        return dataset
+        if isinstance(data, (list, tuple)):
+            datasets = []
+            for i, dataelement in enumerate(data):
+                logger.debug(
+                    f'Building {cls.__name__} dataset {i+1}/{len(data)} from \'{path}{internal_path}\''
+                )
+                dataset = cls(
+                    phase=phase,
+                    data=dataelement,
+                    planestride=planestride,
+                    fingerprint=fingerprint,
+                    stats=stats,
+                    transformer=transformer,
+                    classlabel_mapping=classlabel_mapping,
+                )
+                datasets.append(dataset)
+            return datasets
+        else:
+            dataset = cls(
+                phase=phase,
+                data=data,
+                planestride=planestride,
+                fingerprint=fingerprint,
+                stats=stats,
+                transformer=transformer,
+                classlabel_mapping=classlabel_mapping,
+            )
+            return dataset
 
     @classmethod
     def bulk_build_from_zarr(
@@ -325,9 +417,9 @@ class V3TriaxialDataset(Dataset):
         paths: Sequence[str | Path],
         internal_path: str,
         phase: Literal['train', 'val', 'test'],
-        planestride: tuple[int, int, int],
+        planestride: int | tuple[int, int, int],
         transformer: Callable[[torch.Tensor], torch.Tensor],
-        subselector: slb.BaseSubselector | Callable[[np.ndarray], np.ndarray] | None = None,
+        pipeline: Pipeline | PipelineStep | Callable[[np.ndarray], np.ndarray] | None = None,
         scaling_policy: Literal['default', 'clipping'] | None = 'default',
         classlabel_mapping: dict[str, int] | None = None, 
         leave_pbar: bool = False,
@@ -344,15 +436,18 @@ class V3TriaxialDataset(Dataset):
         )
         for path in wrapped_paths:
             wrapped_paths.set_postfix_str(f'Loading {path.stem}')
-            dataset = cls.build_from_zarr(
+            elements = cls.build_from_zarr(
                 path=path,
                 internal_path=internal_path,
                 phase=phase,
                 planestride=planestride,
                 transformer=transformer,
-                subselector=subselector,
+                pipeline=pipeline,
                 scaling_policy=scaling_policy,
                 classlabel_mapping=classlabel_mapping
             )
-            datasets.append(dataset)
+            # elements can be a single dataset or a sequence of datasets
+            # depending on the pipeline that can split/chunk data from a zarr store
+            elements = elements if isinstance(elements, (list, tuple)) else [elements]
+            datasets.extend(elements)
         return datasets
